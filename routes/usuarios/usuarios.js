@@ -16,9 +16,14 @@ route.post('/usuarioLogin', async (req, res) => {
 });
 
 route.post('/administradorLogin', async (req, res) => {
-  const { mob_usuarios_id } = req.body;
-  const resposta = await administradores.findOne({ where: { mob_usuarios_id } });
-  resposta ? res.send(resposta) : res.send(false);
+  try {
+    const { mob_usuarios_id } = req.body;
+    const resposta = await administradores.findOne({ where: { mob_usuarios_id } });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('Erro em /usuarioLogin!');
+    console.log(error.message);
+  }
 });
 
 module.exports = route;

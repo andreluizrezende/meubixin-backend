@@ -17,6 +17,14 @@ const rotaTipoSintomas = require('./routes/tabelasControle/tipoSintomas');
 const rotaTipoTecidos = require('./routes/tabelasControle/tipoTecidos');
 const rotaTutores = require('./routes/tutorAnimal/tutor');
 const rotaAnimais = require('./routes/tutorAnimal/animal');
+const rotaAnamneses = require('./routes/anamneses/anamneses');
+const rotaSistemaDigestorio = require('./routes/tabelasSistemas/sistemaDigestorio');
+const rotaSistemaCardioRespiratorio = require('./routes/tabelasSistemas/sistemaCardioRespiratorio')
+const rotaSistemaGenitoUrinario = require('./routes/tabelasSistemas/sistemaGenitoUrinario')
+const rotaSistemaNervosoLocomotor = require('./routes/tabelasSistemas/sistemaNervosoLocomotor')
+const rotaSistemaOtoTegumentar = require('./routes/tabelasSistemas/sistemaOtoTegumentar')
+const rotaAntecedentesMorbidos = require('./routes/antecedentesMorbidos/antecedentesMorbidos')
+const rotaManejo = require('./routes/manejo/manejo')
 
 app.use('/', rotaInicial);
 app.use('/', rotaUsuarios);
@@ -27,5 +35,13 @@ app.use('/', rotaTipoSintomas);
 app.use('/', rotaTipoTecidos);
 app.use('/', rotaTutores);
 app.use('/', rotaAnimais);
+app.use('/',rotaAnamneses);
+app.use('/', rotaSistemaDigestorio)
+app.use('/', rotaSistemaCardioRespiratorio)
+app.use('/', rotaSistemaGenitoUrinario)
+app.use('/', rotaSistemaNervosoLocomotor)
+app.use('/', rotaSistemaOtoTegumentar)
+app.use('/',rotaAntecedentesMorbidos)
+app.use('/', rotaManejo)
 
 app.listen(PORT, () => console.log(`running on port: ${PORT}`));
