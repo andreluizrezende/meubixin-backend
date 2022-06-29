@@ -25,6 +25,8 @@ const rotaSistemaNervosoLocomotor = require('./routes/tabelasSistemas/sistemaNer
 const rotaSistemaOtoTegumentar = require('./routes/tabelasSistemas/sistemaOtoTegumentar')
 const rotaAntecedentesMorbidos = require('./routes/antecedentesMorbidos/antecedentesMorbidos')
 const rotaManejo = require('./routes/manejo/manejo')
+const rotaFeridas = require('./routes/feridas/feridas')
+const rotaImagemFeridas = require('./routes/imagensFeridas/imagensFeridas')
 
 app.use('/', rotaInicial);
 app.use('/', rotaUsuarios);
@@ -43,5 +45,7 @@ app.use('/', rotaSistemaNervosoLocomotor)
 app.use('/', rotaSistemaOtoTegumentar)
 app.use('/',rotaAntecedentesMorbidos)
 app.use('/', rotaManejo)
+app.use('/', rotaFeridas)
+app.use('/', rotaImagemFeridas)
 
 app.listen(PORT, () => console.log(`running on port: ${PORT}`));

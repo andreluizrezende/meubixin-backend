@@ -3,7 +3,7 @@ const {
   Model
 } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
-  class Mob_sistema_digestorio extends Model {
+  class Mob_feridas extends Model {
     /**
      * Helper method for defining associations.
      * This method is not a part of Sequelize lifecycle.
@@ -13,16 +13,18 @@ module.exports = (sequelize, DataTypes) => {
       // define association here
     }
   }
-  Mob_sistema_digestorio.init({
+  Mob_feridas.init({
     mob_anamneses_id: DataTypes.INTEGER,
-    ds_apetite: DataTypes.STRING,
-    ds_regurgitacao: DataTypes.STRING,
-    ds_fezes: DataTypes.STRING,
-    ds_ingestao_agua: DataTypes.STRING
+    mob_tipo_exsudatos_id: DataTypes.INTEGER,
+    mob_tipo_sintomas_id: DataTypes.INTEGER,
+    mob_local_feridas_id: DataTypes.INTEGER,
+    mob_tipo_tecidos_id: DataTypes.INTEGER,
+    mob_qtd_exsudatos_id: DataTypes.INTEGER,
+    vl_comprimento: DataTypes.FLOAT,
+    vl_largura: DataTypes.FLOAT
   }, {
     sequelize,
-    modelName: 'mob_sistema_digestorio',
-    freezeTableName: true
+    modelName: 'mob_feridas',
   });
-  return Mob_sistema_digestorio;
+  return Mob_feridas;
 };

@@ -3,7 +3,7 @@ const {
   Model
 } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
-  class mob_sistema_oto_tegumentar extends Model {
+  class Mob_sistema_oto_tegumentar extends Model {
     /**
      * Helper method for defining associations.
      * This method is not a part of Sequelize lifecycle.
@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       // define association here
     }
   }
-  mob_sistema_oto_tegumentar.init({
+  Mob_sistema_oto_tegumentar.init({
     mob_anamneses_id: DataTypes.INTEGER,
     ds_pele: DataTypes.STRING,
     ds_orelha: DataTypes.STRING,
@@ -23,5 +23,5 @@ module.exports = (sequelize, DataTypes) => {
     modelName: 'mob_sistema_oto_tegumentar',
     freezeTableName: true
   });
-  return mob_sistema_oto_tegumentar;
+  return Mob_sistema_oto_tegumentar;
 };

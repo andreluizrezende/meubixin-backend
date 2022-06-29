@@ -3,7 +3,7 @@ const {
   Model
 } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
-  class mob_sistema_cardio_respiratorio extends Model {
+  class Mob_sistema_cardio_respiratorio extends Model {
     /**
      * Helper method for defining associations.
      * This method is not a part of Sequelize lifecycle.
@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       // define association here
     }
   }
-  mob_sistema_cardio_respiratorio.init({
+  Mob_sistema_cardio_respiratorio.init({
     mob_anamneses_id: DataTypes.INTEGER,
     ds_respiracao: DataTypes.STRING,
     ds_tosse: DataTypes.STRING,
@@ -27,5 +27,5 @@ module.exports = (sequelize, DataTypes) => {
     modelName: 'mob_sistema_cardio_respiratorio',
     freezeTableName: true
   });
-  return mob_sistema_cardio_respiratorio;
+  return Mob_sistema_cardio_respiratorio;
 };
