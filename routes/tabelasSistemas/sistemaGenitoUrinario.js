@@ -26,8 +26,8 @@ route.get('/sistema_genito_urinario/:id', async (req, res) => {
 
 route.post('/sistema_genito_urinario', async (req, res) => {
   try {
-    const { mob_anamneses_id, ds_miccao, ds_femeas, ds_machos } = req.body;
-    const resposta = await mob_sistema_genito_urinario.create({  mob_anamneses_id, ds_miccao, ds_femeas, ds_machos });
+    const { mob_anamneses_id, ds_miccao, ds_libido, ds_cruzamentos, ds_castrado, ds_agressivo, ds_postura_miccao, vl_intervalo_cios, ds_pseudociese, ds_contraceptivos_ds_corrimento, ds_secrecao, ds_parto_anterior, ds_aborto } = req.body;
+    const resposta = await mob_sistema_genito_urinario.create({ mob_anamneses_id, ds_miccao, ds_libido, ds_cruzamentos, ds_castrado, ds_agressivo, ds_postura_miccao, vl_intervalo_cios, ds_pseudociese, ds_contraceptivos_ds_corrimento, ds_secrecao, ds_parto_anterior, ds_aborto });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log('ERRO em /mob_sistema_genito_urinario');
@@ -37,8 +37,8 @@ route.post('/sistema_genito_urinario', async (req, res) => {
 
 route.put('/sistema_genito_urinario', async (req, res) => {
   try {
-    const { id,  mob_anamneses_id, ds_miccao, ds_femeas, ds_machos } = req.body;
-    const resposta = await mob_sistema_genito_urinario.update({  mob_anamneses_id, ds_miccao, ds_femeas, ds_machos }, { where: { id } });
+    const { id, mob_anamneses_id, ds_miccao, ds_libido, ds_cruzamentos, ds_castrado, ds_agressivo, ds_postura_miccao, vl_intervalo_cios, ds_pseudociese, ds_contraceptivos_ds_corrimento, ds_secrecao, ds_parto_anterior, ds_aborto } = req.body;
+    const resposta = await mob_sistema_genito_urinario.update({ mob_anamneses_id, ds_miccao, ds_libido, ds_cruzamentos, ds_castrado, ds_agressivo, ds_postura_miccao, vl_intervalo_cios, ds_pseudociese, ds_contraceptivos_ds_corrimento, ds_secrecao, ds_parto_anterior, ds_aborto }, { where: { id } });
     resposta[0] ? res.send(true) : res.send(false);
   } catch (error) {
     console.log('ERRO em /mob_sistema_genito_urinario');
