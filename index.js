@@ -6,6 +6,7 @@ const PORT = 3000;
 // middlewares
 app.use(express.json());
 app.use(cors());
+app.use(express.static('uploads'));
 
 // routes
 const rotaInicial = require('./routes/initial');
@@ -19,14 +20,15 @@ const rotaTutores = require('./routes/tutorAnimal/tutor');
 const rotaAnimais = require('./routes/tutorAnimal/animal');
 const rotaAnamneses = require('./routes/anamneses/anamneses');
 const rotaSistemaDigestorio = require('./routes/tabelasSistemas/sistemaDigestorio');
-const rotaSistemaCardioRespiratorio = require('./routes/tabelasSistemas/sistemaCardioRespiratorio')
-const rotaSistemaGenitoUrinario = require('./routes/tabelasSistemas/sistemaGenitoUrinario')
-const rotaSistemaNervosoLocomotor = require('./routes/tabelasSistemas/sistemaNervosoLocomotor')
-const rotaSistemaOtoTegumentar = require('./routes/tabelasSistemas/sistemaOtoTegumentar')
-const rotaAntecedentesMorbidos = require('./routes/antecedentesMorbidos/antecedentesMorbidos')
-const rotaManejo = require('./routes/manejo/manejo')
-const rotaFeridas = require('./routes/feridas/feridas')
-const rotaImagemFeridas = require('./routes/imagensFeridas/imagensFeridas')
+const rotaSistemaCardioRespiratorio = require('./routes/tabelasSistemas/sistemaCardioRespiratorio');
+const rotaSistemaGenitoUrinario = require('./routes/tabelasSistemas/sistemaGenitoUrinario');
+const rotaSistemaNervosoLocomotor = require('./routes/tabelasSistemas/sistemaNervosoLocomotor');
+const rotaSistemaOtoTegumentar = require('./routes/tabelasSistemas/sistemaOtoTegumentar');
+const rotaAntecedentesMorbidos = require('./routes/antecedentesMorbidos/antecedentesMorbidos');
+const rotaManejo = require('./routes/manejo/manejo');
+const rotaFeridas = require('./routes/feridas/feridas');
+const rotaImagemFeridas = require('./routes/imagensFeridas/imagensFeridas');
+const rotaUpload = require('./routes/uploadImagens/upload');
 
 app.use('/', rotaInicial);
 app.use('/', rotaUsuarios);
@@ -37,15 +39,16 @@ app.use('/', rotaTipoSintomas);
 app.use('/', rotaTipoTecidos);
 app.use('/', rotaTutores);
 app.use('/', rotaAnimais);
-app.use('/',rotaAnamneses);
-app.use('/', rotaSistemaDigestorio)
-app.use('/', rotaSistemaCardioRespiratorio)
-app.use('/', rotaSistemaGenitoUrinario)
-app.use('/', rotaSistemaNervosoLocomotor)
-app.use('/', rotaSistemaOtoTegumentar)
-app.use('/',rotaAntecedentesMorbidos)
-app.use('/', rotaManejo)
-app.use('/', rotaFeridas)
-app.use('/', rotaImagemFeridas)
+app.use('/', rotaAnamneses);
+app.use('/', rotaSistemaDigestorio);
+app.use('/', rotaSistemaCardioRespiratorio);
+app.use('/', rotaSistemaGenitoUrinario);
+app.use('/', rotaSistemaNervosoLocomotor);
+app.use('/', rotaSistemaOtoTegumentar);
+app.use('/', rotaAntecedentesMorbidos);
+app.use('/', rotaManejo);
+app.use('/', rotaFeridas);
+app.use('/', rotaImagemFeridas);
+app.use('/', rotaUpload);
 
 app.listen(PORT, () => console.log(`running on port: ${PORT}`));

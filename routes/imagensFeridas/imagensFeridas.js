@@ -26,8 +26,8 @@ route.get('/imagens_feridas/:id', async (req, res) => {
 
 route.post('/imagens_feridas', async (req, res) => {
   try {
-    const { mob_feridas_id, ds_camino_server, vl_largura_imagem, vl_altura_imagem, vl_largura_detector, vl_altura_detector, vl_eixo_x, vl_eixo_y } = req.body;
-    const resposta = await mob_imagens_feridas.create({ mob_feridas_id, ds_camino_server, vl_largura_imagem, vl_altura_imagem, vl_largura_detector, vl_altura_detector, vl_eixo_x, vl_eixo_y });
+    const { mob_feridas_id, vl_largura_imagem, vl_altura_imagem, vl_largura_detector, vl_altura_detector, vl_eixo_x, vl_eixo_y } = req.body;
+    const resposta = await mob_imagens_feridas.create({ mob_feridas_id, vl_largura_imagem, vl_altura_imagem, vl_largura_detector, vl_altura_detector, vl_eixo_x, vl_eixo_y });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log('ERRO em /mob_imagens_feridas');
