@@ -24,6 +24,17 @@ route.get('/animais/:id', async (req, res) => {
   }
 });
 
+route.get('/animalNome/:no_nome', async (req, res) => {
+  try {
+    const { no_nome } = req.params;
+    const resposta = await mob_animais.findOne({ where: { no_nome } });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /animalNome');
+    console.log(error.message);
+  }
+});
+
 route.post('/animais', async (req, res) => {
   try {
     const { no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade, mob_tutores_id } = req.body;
