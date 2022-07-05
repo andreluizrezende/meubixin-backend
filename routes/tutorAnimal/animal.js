@@ -27,7 +27,7 @@ route.get('/animais/:id', async (req, res) => {
 route.get('/animalNome/:no_nome', async (req, res) => {
   try {
     const { no_nome } = req.params;
-    const resposta = await mob_animais.findOne({ where: { no_nome } });
+    const resposta = await mob_animais.findAll({ where: { no_nome } });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log('ERRO em /animalNome');
