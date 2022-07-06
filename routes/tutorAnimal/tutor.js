@@ -1,7 +1,7 @@
 const express = require('express');
 const route = express.Router();
 const models = require('../../models');
-const { mob_tutores, mob_animais } = models;
+const { mob_tutores } = models;
 const Op = require('sequelize').Op;
 
 route.get('/tutores', async (req, res) => {
@@ -25,34 +25,14 @@ route.get('/tutores/:id', async (req, res) => {
   }
 });
 
-route.get('/tutorNome/:no_completo', async (req, res) => {
-  try {
-    const { no_completo } = req.params;
-    const resposta = await mob_animais.findAll({
-      include: [{
-        model: mob_tutores,
-        where: { no_completo: { [Op.like]: `${no_completo}%` } }
-      }]
-    });
-    resposta ? res.send(resposta) : res.send(false);
-  } catch (error) {
-    console.log('ERRO em /tutorNome');
-    console.log(error.message);
-  }
-});
 
-route.get('/tutorCpf/:nu_cpf', async (req, res) => {
+route.get('/tutoresCpf/:nu_cpf', async (req, res) => {
   try {
     const { nu_cpf } = req.params;
-    const resposta = await mob_animais.findAll({
-      include: [{
-        model: mob_tutores,
-        where: { nu_cpf }
-      }]
-    });
+    const resposta = await mob_tutores.findOne({ where: { nu_cpf } });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
-    console.log('ERRO em /tutorCpf');
+    console.log('ERRO em /tutores');
     console.log(error.message);
   }
 });

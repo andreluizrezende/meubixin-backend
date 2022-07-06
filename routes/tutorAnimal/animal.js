@@ -38,6 +38,38 @@ route.get('/animalNome/:no_nome', async (req, res) => {
   }
 });
 
+route.get('/animalNomeTutor/:no_completo', async (req, res) => {
+  try {
+    const { no_completo } = req.params;
+    const resposta = await mob_animais.findAll({
+      include: [{
+        model: mob_tutores,
+        where: { no_completo: { [Op.like]: `${no_completo}%` } }
+      }]
+    });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /tutorNome');
+    console.log(error.message);
+  }
+});
+
+route.get('/animalCpf/:nu_cpf', async (req, res) => {
+  try {
+    const { nu_cpf } = req.params;
+    const resposta = await mob_animais.findAll({
+      include: [{
+        model: mob_tutores,
+        where: { nu_cpf }
+      }]
+    });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /tutorCpf');
+    console.log(error.message);
+  }
+});
+
 route.post('/animais', async (req, res) => {
   try {
     const { no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade, mob_tutores_id } = req.body;
