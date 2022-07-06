@@ -11,6 +11,7 @@ module.exports = (sequelize, DataTypes) => {
      */
     static associate(models) {
       // define association here
+      Mob_animais.belongsTo(models.mob_tutores, { foreignKey: 'mob_tutores_id' });
     }
   }
   Mob_animais.init({

@@ -1,7 +1,7 @@
 const express = require('express');
 const route = express.Router();
 const models = require('../../models');
-const { mob_animais } = models;
+const { mob_animais, mob_tutores } = models;
 
 route.get('/animais', async (req, res) => {
   try {
@@ -27,7 +27,9 @@ route.get('/animais/:id', async (req, res) => {
 route.get('/animalNome/:no_nome', async (req, res) => {
   try {
     const { no_nome } = req.params;
-    const resposta = await mob_animais.findAll({ where: { no_nome } });
+    const resposta = await mob_animais.findAll({
+      include: mob_tutores, where: { no_nome }
+    });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log('ERRO em /animalNome');

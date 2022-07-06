@@ -1,7 +1,7 @@
 const express = require('express');
 const route = express.Router();
 const models = require('../../models');
-const { mob_tutores } = models;
+const { mob_tutores, mob_animais } = models;
 
 route.get('/tutores', async (req, res) => {
   try {
@@ -27,7 +27,13 @@ route.get('/tutores/:id', async (req, res) => {
 route.get('/tutorNome/:no_completo', async (req, res) => {
   try {
     const { no_completo } = req.params;
-    const resposta = await mob_tutores.findAll({ where: { no_completo } });
+    const resposta = await mob_tutores.findAll({
+      include: [{
+        model: mob_animais,
+        required: true,
+        order: [['id']]
+      }], where: { no_completo }
+    });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log('ERRO em /tutorNome');
