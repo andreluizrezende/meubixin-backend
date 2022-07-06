@@ -2,6 +2,7 @@ const express = require('express');
 const route = express.Router();
 const models = require('../../models');
 const { mob_animais, mob_tutores } = models;
+const Op = require('sequelize').Op;
 
 route.get('/animais', async (req, res) => {
   try {
@@ -28,7 +29,7 @@ route.get('/animalNome/:no_nome', async (req, res) => {
   try {
     const { no_nome } = req.params;
     const resposta = await mob_animais.findAll({
-      include: mob_tutores, where: { no_nome }
+      include: mob_tutores, where: { no_nome: { [Op.like]: `${no_nome}%` } }
     });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
