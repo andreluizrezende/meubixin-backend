@@ -47,6 +47,9 @@ module.exports = {
       ds_claudicacao: {
         type: Sequelize.STRING
       },
+      dt_data:{
+        type: Sequelize.DATE
+      },
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE

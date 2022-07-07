@@ -22,7 +22,8 @@ module.exports = (sequelize, DataTypes) => {
     ds_raca: DataTypes.STRING,
     ds_trauma: DataTypes.STRING,
     vl_cirurgia: DataTypes.INTEGER,
-    ds_claudicacao: DataTypes.STRING
+    ds_claudicacao: DataTypes.STRING,
+    dt_data: DataTypes.DATE
   }, {
     sequelize,
     modelName: 'mob_anamneses',

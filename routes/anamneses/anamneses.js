@@ -39,8 +39,8 @@ route.get('/anamneses', async (req, res) => {
   
   route.post('/anamneses', async (req, res) => {
     try {
-      const { mob_usuarios_id, mob_animais_id, ds_temperamento, vl_peso, ds_talhe, ds_raca, ds_trauma, vl_cirurgia, ds_claudicacao } = req.body;
-      const resposta = await mob_anamneses.create({  mob_usuarios_id, mob_animais_id, ds_temperamento, vl_peso, ds_talhe, ds_raca, ds_trauma, vl_cirurgia, ds_claudicacao });
+      const { mob_usuarios_id, mob_animais_id, ds_temperamento, vl_peso, ds_talhe, ds_raca, ds_trauma, vl_cirurgia, ds_claudicacao, dt_data } = req.body;
+      const resposta = await mob_anamneses.create({  mob_usuarios_id, mob_animais_id, ds_temperamento, vl_peso, ds_talhe, ds_raca, ds_trauma, vl_cirurgia, ds_claudicacao, dt_data });
       resposta ? res.send(resposta) : res.send(false);
     } catch (error) {
       console.log('ERRO em /mob_anamneses');
@@ -50,8 +50,8 @@ route.get('/anamneses', async (req, res) => {
   
   route.put('/anamneses', async (req, res) => {
     try {
-      const { id, mob_usuarios_id, mob_animais_id, ds_temperamento, vl_peso, ds_talhe, ds_raca, ds_trauma, vl_cirurgia, ds_claudicacao } = req.body;
-      const resposta = await mob_anamneses.update({ mob_usuarios_id, mob_animais_id, ds_temperamento, vl_peso, ds_talhe, ds_raca, ds_trauma, vl_cirurgia, ds_claudicacao }, { where: { id } });
+      const { id, mob_usuarios_id, mob_animais_id, ds_temperamento, vl_peso, ds_talhe, ds_raca, ds_trauma, vl_cirurgia, ds_claudicacao, dt_data} = req.body;
+      const resposta = await mob_anamneses.update({ mob_usuarios_id, mob_animais_id, ds_temperamento, vl_peso, ds_talhe, ds_raca, ds_trauma, vl_cirurgia, ds_claudicacao, dt_data }, { where: { id } });
       resposta[0] ? res.send(true) : res.send(false);
     } catch (error) {
       console.log('ERRO em /mob_anamneses');
