@@ -23,6 +23,19 @@ route.get('/anamneses', async (req, res) => {
       console.log(error.message);
     }
   });
+
+  route.get('/anamnsesUserid/:User_id', async (req, res) => {
+    try {
+      const { User_id } = req.params;
+      const resposta = await mob_anamneses.findAll({
+        where: { mob_usuarios_id: User_id }
+      });
+      resposta ? res.send(resposta) : res.send(false);
+    } catch (error) {
+      console.log('ERRO em /anamnsesUserid');
+      console.log(error.message);
+    }
+  });
   
   route.post('/anamneses', async (req, res) => {
     try {
