@@ -26,9 +26,12 @@ route.get('/anamneses', async (req, res) => {
 
   route.get('/anamnsesAnimalid/:Animal_id', async (req, res) => {
     try {
-      const { Animal_id } = req.params;
+      const { Animal_id, dt_data } = req.params;
       const resposta = await mob_anamneses.findAll({
-        where: { mob_animais_id: Animal_id }
+        where: { mob_animais_id: Animal_id }, 
+        order: [
+          ['dt_data', 'DESC']
+      ],
       });
       resposta ? res.send(resposta) : res.send(false);
     } catch (error) {
