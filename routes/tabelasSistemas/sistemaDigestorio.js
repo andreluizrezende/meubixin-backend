@@ -24,6 +24,19 @@ route.get('/sistema_digestorio/:id', async (req, res) => {
   }
 });
 
+route.get('/sistema_digestorioAnamneseID/:Anamnese_id', async (req, res) => {
+  try {
+    const { Anamnese_id } = req.params;
+    const resposta = await mob_sistema_digestorio.findOne({
+      where: { mob_anamneses_id: Anamnese_id } 
+    });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /sistema_digestorioAnamneseID');
+    console.log(error.message);
+  }
+});
+
 route.post('/sistema_digestorio', async (req, res) => {
   try {
     const { mob_anamneses_id, ds_apetite, ds_regurgitacao, ds_fezes, ds_ingestao_agua } = req.body;
