@@ -24,6 +24,19 @@ route.get('/sistema_cardio_respiratorio/:id', async (req, res) => {
   }
 });
 
+route.get('/sistema_cardio_respiratorioAnamneseID/:Anamnese_id', async (req, res) => {
+  try {
+    const { Anamnese_id } = req.params;
+    const resposta = await mob_sistema_cardio_respiratorio.findOne({
+      where: { mob_anamneses_id: Anamnese_id } 
+    });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /sistema_cardio_respiratorioAnamneseID');
+    console.log(error.message);
+  }
+});
+
 route.post('/sistema_cardio_respiratorio', async (req, res) => {
   try {
     const { mob_anamneses_id, ds_respiracao, ds_tosse, ds_espirro, ds_secrecao_nasal, ds_secrecao_ocular, ds_intolerancia_exercicio, ds_aumento_volume } = req.body;
