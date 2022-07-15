@@ -24,6 +24,19 @@ route.get('/sistema_oto_tegumentar/:id', async (req, res) => {
   }
 });
 
+route.get('/sistema_otoTegumentarAnamneseID/:Anamnese_id', async (req, res) => {
+  try {
+    const { Anamnese_id } = req.params;
+    const resposta = await mob_sistema_oto_tegumentar.findOne({
+      where: { mob_anamneses_id: Anamnese_id }
+    });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /sistema_OtoTegumentarAnamneseID');
+    console.log(error.message);
+  }
+});
+
 route.post('/sistema_oto_tegumentar', async (req, res) => {
   try {
     const { mob_anamneses_id, ds_pele, ds_orelha, ds_unha } = req.body;
