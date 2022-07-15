@@ -24,6 +24,19 @@ route.get('/sistema_nervoso_locomotor/:id', async (req, res) => {
   }
 });
 
+route.get('/sistema_nervoso_locomotorAnamneseID/:Anamnese_id', async (req, res) => {
+  try {
+    const { Anamnese_id } = req.params;
+    const resposta = await mob_sistema_nervoso_locomotor.findOne({
+      where: { mob_anamneses_id: Anamnese_id } 
+    });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /sistema_nervoso_locomotorAnamneseID');
+    console.log(error.message);
+  }
+});
+
 route.post('/sistema_nervoso_locomotor', async (req, res) => {
   try {
     const { mob_anamneses_id, ds_convulsoes, ds_alteracao_comportamento, ds_postura, ds_possibilidade_intoxicacao } = req.body;
