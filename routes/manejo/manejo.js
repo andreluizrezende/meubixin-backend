@@ -13,6 +13,19 @@ route.get('/manejo', async (req, res) => {
   }
 });
 
+route.get('/manejoAnimaisID/:Animais_id', async (req, res) => {
+  try {
+    const { Animais_id } = req.params;
+    const resposta = await mob_manejo.findOne({
+      where: { mob_animais_id: Animais_id }
+    });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /sistema_OtoTegumentarAnamneseID');
+    console.log(error.message);
+  }
+});
+
 route.get('/manejo/:id', async (req, res) => {
   try {
     const { id } = req.params;
