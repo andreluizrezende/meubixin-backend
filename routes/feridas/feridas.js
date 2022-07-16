@@ -24,6 +24,19 @@ route.get('/feridas/:id', async (req, res) => {
   }
 });
 
+route.get('/FeridasAnamneseID/:Anamnese_id', async (req, res) => {
+  try {
+    const { Anamnese_id } = req.params;
+    const resposta = await mob_feridas.findAll({
+      where: { mob_anamneses_id: Anamnese_id } 
+    });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /sistema_digestorioAnamneseID');
+    console.log(error.message);
+  }
+});
+
 route.post('/feridas', async (req, res) => {
   try {
     const { mob_anamneses_id, mob_tipo_exsudatos_id, mob_tipo_sintomas_id, mob_local_feridas_id, mob_tipo_tecidos_id, mob_qtd_exsudatos_id, vl_comprimento, vl_largura } = req.body;
