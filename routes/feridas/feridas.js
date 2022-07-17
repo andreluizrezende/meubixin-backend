@@ -1,7 +1,7 @@
 const express = require('express');
 const route = express.Router();
 const models = require('../../models');
-const { mob_feridas } = models;
+const { mob_feridas, mob_local_feridas } = models;
 
 route.get('/feridas', async (req, res) => {
   try {
@@ -28,7 +28,10 @@ route.get('/FeridasAnamneseID/:Anamnese_id', async (req, res) => {
   try {
     const { Anamnese_id } = req.params;
     const resposta = await mob_feridas.findAll({
-      where: { mob_anamneses_id: Anamnese_id } 
+      where: { mob_anamneses_id: Anamnese_id },
+        include: [{
+          model: mob_local_feridas
+        }]     
     });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {

@@ -10,7 +10,7 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-      // define association here
+      Mob_feridas.belongsTo(models.mob_local_feridas, { foreignKey: 'mob_local_feridas_id' });
     }
   }
   Mob_feridas.init({
