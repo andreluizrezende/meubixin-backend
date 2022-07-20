@@ -11,6 +11,10 @@ module.exports = (sequelize, DataTypes) => {
      */
     static associate(models) {
       Mob_feridas.belongsTo(models.mob_local_feridas, { foreignKey: 'mob_local_feridas_id' });
+      Mob_feridas.belongsTo(models.mob_tipo_sintomas, { foreignKey: 'mob_tipo_sintomas_id' });
+      Mob_feridas.belongsTo(models.mob_tipo_tecidos, { foreignKey: 'mob_tipo_tecidos_id' });
+      Mob_feridas.belongsTo(models.mob_qtd_exsudatos, { foreignKey: 'mob_qtd_exsudatos_id' });
+      Mob_feridas.belongsTo(models.mob_tipo_exsudatos, { foreignKey: 'mob_tipo_exsudatos_id' });
     }
   }
   Mob_feridas.init({
