@@ -1,6 +1,9 @@
 const express = require('express');
 const route = express.Router();
 const models = require('../../models');
+const upload = require('../../utils/multer');
+const { getFileStream, listBuckets, createBucket, uploadFile, listFileStream, deleteFile } = require('../../utils/s3');
+const fs = require('fs');
 const { mob_imagens_feridas } = models;
 
 route.get('/imagens_feridas', async (req, res) => {
@@ -61,6 +64,17 @@ route.delete('/imagens_feridas/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const resposta = await mob_imagens_feridas.destroy({ where: { id } });
+    resposta ? res.send(true) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /mob_imagens_feridas');
+    console.log(error.message);
+  }
+});
+
+route.delete('/imagens_feridasByFeridasId/:mob_feridas_id', async (req, res) => {
+  try {
+    const { mob_feridas_id } = req.params;
+    const resposta = await mob_imagens_feridas.destroy({ where: { mob_feridas_id } });
     resposta ? res.send(true) : res.send(false);
   } catch (error) {
     console.log('ERRO em /mob_imagens_feridas');

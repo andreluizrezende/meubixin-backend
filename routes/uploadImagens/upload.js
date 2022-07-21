@@ -1,8 +1,8 @@
 const express = require('express');
 const route = express.Router();
 const upload = require('../../utils/multer');
-const fs = require('fs');
 const { getFileStream, listBuckets, createBucket, uploadFile, listFileStream, deleteFile } = require('../../utils/s3');
+const fs = require('fs');
 const path = require('path');
 const models = require('../../models');
 const { mob_imagens_feridas } = models;
@@ -39,14 +39,14 @@ route.get('/upload', (req, res) => {
 
 route.post('/upload', upload.single("img"), async (req, res) => {
   try {
-    const id = Number(req.body.id);
     const fileStream = fs.createReadStream(req.file.path);
     const file = req.file.filename;
+    uploadFile(fileStream, file);
 
+    const id = Number(req.body.id);
     const ds_caminho_server = `/upload/${file}.png`;
     const resposta = await mob_imagens_feridas.update({ ds_caminho_server }, { where: { id } });
 
-    uploadFile(fileStream, file);
 
     resposta[0] ? res.send(ds_caminho_server) : res.send(false);
   } catch (error) {
@@ -79,12 +79,8 @@ route.delete('/upload/:key', async (req, res) => {
   try {
     const { key } = req.params;
     const keyS3 = key.split('.')[0];
-    const pathFile = path.resolve(__dirname, "..", "..", "uploads", `${key}`);
-    deleteFile(keyS3);
-    fs.rm(path.resolve(pathFile), (err, data) => {
-      if (err) return res.send(err);
-      res.send(true);
-    });
+    await deleteFile(keyS3);
+    res.send(true);
   } catch (error) {
     console.log('ERRO em /upload');
     console.log(error.message);
