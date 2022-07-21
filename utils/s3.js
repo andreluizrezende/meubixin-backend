@@ -32,19 +32,8 @@ async function getFileStream(Key) {
   const downloadParams = { Key, Bucket }
 
   try {
-    const streamToString = (stream) =>
-      new Promise((resolve, reject) => {
-        const chunks = [];
-        stream.on("data", (chunk) => chunks.push(chunk));
-        stream.on("error", reject);
-        stream.on("end", () => resolve(Buffer.concat(chunks)));
-      });
-
     const data = await s3.send(new GetObjectCommand(downloadParams));
-
-    const bodyContents = await streamToString(data.Body);
-    //console.log(bodyContents);
-    return bodyContents;
+    return data.Body;
   } catch (err) {
     console.log("Error", err);
   }

@@ -11,10 +11,22 @@ route.get('/upload/:key', async (req, res) => {
   try {
     const { key } = req.params;
     const keyS3 = key.split('.')[0];
-    const bufferImg = await getFileStream(keyS3);
-    if (!bufferImg) return res.send(false);
-    console.log(bufferImg);
-    res.send(JSON.stringify(bufferImg));
+    const streamRead = await getFileStream(keyS3);
+    if (!streamRead) return res.send(false);
+
+    const streamToString = (stream) =>
+      new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on("data", (chunk) => {
+          chunks.push(chunk)
+        });
+        stream.on("error", reject);
+        stream.on("end", () => resolve(Buffer.concat(chunks).toString('base64')));
+      });
+    const mimeType = 'image/png';
+    const b64 = await streamToString(streamRead);
+    const formatRender = `data:${mimeType};base64,${b64}`;
+    res.send(JSON.stringify(formatRender));
   } catch (error) {
     console.log('ERRO em /upload');
     console.log(error.message);

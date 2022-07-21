@@ -24,6 +24,17 @@ route.get('/imagens_feridas/:id', async (req, res) => {
   }
 });
 
+route.get('/imagens_feridasByIdFerida/:mob_feridas_id', async (req, res) => {
+  try {
+    const { mob_feridas_id } = req.params;
+    const resposta = await mob_imagens_feridas.findAll({ where: { mob_feridas_id } });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /mob_imagens_feridas');
+    console.log(error.message);
+  }
+});
+
 route.post('/imagens_feridas', async (req, res) => {
   try {
     const { mob_feridas_id, vl_largura_imagem, vl_altura_imagem, vl_largura_detector, vl_altura_detector, vl_eixo_x, vl_eixo_y } = req.body;
