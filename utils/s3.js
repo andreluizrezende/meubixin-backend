@@ -37,13 +37,13 @@ async function getFileStream(Key) {
         const chunks = [];
         stream.on("data", (chunk) => chunks.push(chunk));
         stream.on("error", reject);
-        stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+        stream.on("end", () => resolve(Buffer.concat(chunks)));
       });
 
     const data = await s3.send(new GetObjectCommand(downloadParams));
 
     const bodyContents = await streamToString(data.Body);
-    console.log(bodyContents);
+    //console.log(bodyContents);
     return bodyContents;
   } catch (err) {
     console.log("Error", err);

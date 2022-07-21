@@ -11,9 +11,10 @@ route.get('/upload/:key', async (req, res) => {
   try {
     const { key } = req.params;
     const keyS3 = key.split('.')[0];
-    const readStream = await getFileStream(keyS3);
-    if (!readStream) return res.send(false);
-    readStream.pipe(res);
+    const bufferImg = await getFileStream(keyS3);
+    if (!bufferImg) return res.send(false);
+    console.log(bufferImg);
+    res.send(JSON.stringify(bufferImg));
   } catch (error) {
     console.log('ERRO em /upload');
     console.log(error.message);
@@ -30,7 +31,7 @@ route.post('/upload', upload.single("img"), async (req, res) => {
     const fileStream = fs.createReadStream(req.file.path);
     const file = req.file.filename;
 
-    const ds_caminho_server = `http://localhost:3000/upload/${file}`;
+    const ds_caminho_server = `/upload/${file}.png`;
     const resposta = await mob_imagens_feridas.update({ ds_caminho_server }, { where: { id } });
 
     uploadFile(fileStream, file);
