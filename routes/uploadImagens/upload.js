@@ -10,6 +10,7 @@ const { mob_imagens_feridas } = models;
 route.get('/upload/:key', async (req, res) => {
   try {
     const { key } = req.params;
+    console.log(key);
     const keyS3 = key.split('.')[0];
     const streamRead = await getFileStream(keyS3);
     if (!streamRead) return res.send(false);
@@ -23,8 +24,11 @@ route.get('/upload/:key', async (req, res) => {
         stream.on("error", reject);
         stream.on("end", () => resolve(Buffer.concat(chunks).toString('base64')));
       });
+
     const mimeType = 'image/png';
     const b64 = await streamToString(streamRead);
+    console.log(b64);
+
     const formatRender = `data:${mimeType};base64,${b64}`;
     res.send(JSON.stringify(formatRender));
   } catch (error) {
@@ -43,7 +47,7 @@ route.post('/upload', upload.single("img"), async (req, res) => {
     if (!req.file) return res.send(false);
     const fileStream = fs.createReadStream(req.file.path);
     const file = req.file.filename;
-    uploadFile(fileStream, file);
+    await uploadFile(fileStream, file);
 
     const id = Number(req.body.id);
     const ds_caminho_server = `/upload/${file}.png`;
@@ -63,12 +67,12 @@ route.post('/uploadB64', async (req, res) => {
     const id = Number(req.body.id);
 
     fs.writeFile(path.resolve(__dirname, 'temp.png'), b64, 'base64', function (err) {
-      console.log(err);
+      console.log('ERRO:', err);
     });
     const fileStream = fs.createReadStream(path.resolve(__dirname, 'temp.png'))
-
     const file = Date.now() + '-' + Math.round(Math.random() * 1E9) + '-foto';
-    uploadFile(fileStream, file);
+
+    await uploadFile(fileStream, file);
 
     const ds_caminho_server = `/upload/${file}.png`;
     const resposta = await mob_imagens_feridas.update({ ds_caminho_server }, { where: { id } });

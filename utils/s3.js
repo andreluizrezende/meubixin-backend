@@ -14,12 +14,9 @@ const s3 = new S3Client({
 // uploads a file to s3
 async function uploadFile(Body, Key) {
   const uploadParams = { Bucket, Body, Key }
-
   try {
     const data = await s3.send(new PutObjectCommand(uploadParams));
-    console.log(
-      "Successfully uploaded object: " +
-      uploadParams.Bucket + "/" + uploadParams.Key
+    console.log("Successfully uploaded object: " + uploadParams.Bucket + "/" + uploadParams.Key
     );
     return data;
   } catch (err) {
@@ -33,6 +30,7 @@ async function getFileStream(Key) {
 
   try {
     const data = await s3.send(new GetObjectCommand(downloadParams));
+    console.log(data);
     return data.Body;
   } catch (err) {
     console.log("Error", err);
