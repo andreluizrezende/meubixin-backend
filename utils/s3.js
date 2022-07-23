@@ -30,7 +30,6 @@ async function getFileStream(Key) {
 
   try {
     const data = await s3.send(new GetObjectCommand(downloadParams));
-    console.log(data);
     return data.Body;
   } catch (err) {
     console.log("Error", err);

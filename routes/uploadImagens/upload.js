@@ -15,7 +15,7 @@ route.get('/upload/:key', async (req, res) => {
     const streamRead = await getFileStream(keyS3);
     if (!streamRead) return res.send(false);
 
-    const streamToString = (stream) =>
+    const streamToB64 = (stream) =>
       new Promise((resolve, reject) => {
         const chunks = [];
         stream.on("data", (chunk) => {
@@ -26,7 +26,7 @@ route.get('/upload/:key', async (req, res) => {
       });
 
     const mimeType = 'image/png';
-    const b64 = await streamToString(streamRead);
+    const b64 = await streamToB64(streamRead);
 
     const formatRender = `data:${mimeType};base64,${b64}`;
     res.send(JSON.stringify(formatRender));
@@ -42,8 +42,6 @@ route.get('/upload', (req, res) => {
 
 route.post('/upload', upload.single("img"), async (req, res) => {
   try {
-    console.log(req.file);
-    console.log("\n'-'\n");
     if (!req.file) return res.send(false);
     const fileStream = fs.createReadStream(req.file.path);
     const file = req.file.filename;
@@ -65,10 +63,9 @@ route.post('/uploadB64', async (req, res) => {
   try {
     const { b64 } = req.body;
     const id = Number(req.body.id);
-    console.log(id);
 
     fs.writeFileSync(path.resolve(__dirname, 'temp.png'), b64, 'base64', function (err) {
-      console.log('ERRO:', err);
+      console.log('ERRO UPLOAD B64:', err);
     });
     const fileStream = fs.createReadStream(path.resolve(__dirname, 'temp.png'))
     const file = Date.now() + '-' + Math.round(Math.random() * 1E9) + '-foto';
