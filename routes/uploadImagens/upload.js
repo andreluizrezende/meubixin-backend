@@ -39,6 +39,8 @@ route.get('/upload', (req, res) => {
 
 route.post('/upload', upload.single("img"), async (req, res) => {
   try {
+    console.log(req.file);
+    if (!req.file) return res.send(false);
     const fileStream = fs.createReadStream(req.file.path);
     const file = req.file.filename;
     uploadFile(fileStream, file);
@@ -48,6 +50,28 @@ route.post('/upload', upload.single("img"), async (req, res) => {
     const resposta = await mob_imagens_feridas.update({ ds_caminho_server }, { where: { id } });
 
 
+    resposta[0] ? res.send(ds_caminho_server) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /upload');
+    console.log(error.message);
+  }
+});
+
+route.post('/uploadB64', async (req, res) => {
+  try {
+    const { b64 } = req.body;
+    const id = Number(req.body.id);
+
+    fs.writeFile(path.resolve(__dirname, 'temp.png'), b64, 'base64', function (err) {
+      console.log(err);
+    });
+    const fileStream = fs.createReadStream(path.resolve(__dirname, 'temp.png'))
+
+    const file = Date.now() + '-' + Math.round(Math.random() * 1E9) + '-foto';
+    uploadFile(fileStream, file);
+
+    const ds_caminho_server = `/upload/${file}.png`;
+    const resposta = await mob_imagens_feridas.update({ ds_caminho_server }, { where: { id } });
     resposta[0] ? res.send(ds_caminho_server) : res.send(false);
   } catch (error) {
     console.log('ERRO em /upload');
