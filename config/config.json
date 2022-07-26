@@ -4,20 +4,23 @@
     "password": null,
     "database": "cicatribiovet",
     "host": "127.0.0.1",
-    "dialect": "mysql"
+    "dialect": "mysql",
+    "quoteIdentifiers": false
   },
   "test": {
     "username": "admin",
     "password": "5131fc74",
     "database": "cicatribiovet",
     "host": "bioskin-mysql.coahrcxutrai.us-east-2.rds.amazonaws.com",
-    "dialect": "mysql"
+    "dialect": "mysql",
+    "quoteIdentifiers": false
   },
   "production": {
     "username": "admin",
     "password": "5131fc74",
     "database": "cicatribiovet",
     "host": "bioskin-mysql.coahrcxutrai.us-east-2.rds.amazonaws.com",
-    "dialect": "mysql"
+    "dialect": "mysql",
+    "quoteIdentifiers": false
   }
 }
