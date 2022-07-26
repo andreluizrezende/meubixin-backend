@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { S3Client, PutObjectCommand, ListBucketsCommand, CreateBucketCommand, GetObjectCommand, ListObjectsCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
-const Bucket = AWS_BUCKET_NAME = "cicatribioskin";
+const Bucket = AWS_BUCKET_NAME = "cicatribiovet2";
 const region = AWS_BUCKET_REGION = "us-east-2";
 const accessKeyId = AWS_ACCESS_KEY = "REMOVED_AWS_ACCESS_KEY";
 const secretAccessKey = AWS_SECRET_KEY = "REMOVED_AWS_SECRET_KEY";

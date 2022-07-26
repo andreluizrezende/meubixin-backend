@@ -7,17 +7,17 @@
     "dialect": "mysql"
   },
   "test": {
-    "username": "root",
-    "password": null,
-    "database": "database_test",
-    "host": "127.0.0.1",
+    "username": "admin",
+    "password": "5131fc74",
+    "database": "cicatribiovet",
+    "host": "bioskin-mysql.coahrcxutrai.us-east-2.rds.amazonaws.com",
     "dialect": "mysql"
   },
   "production": {
-    "username": "root",
-    "password": null,
-    "database": "database_production",
-    "host": "127.0.0.1",
+    "username": "admin",
+    "password": "5131fc74",
+    "database": "cicatribiovet",
+    "host": "bioskin-mysql.coahrcxutrai.us-east-2.rds.amazonaws.com",
     "dialect": "mysql"
   }
 }
