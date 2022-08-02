@@ -104,6 +104,7 @@ route.put('/upload', upload.single("img"), async (req, res) => {
 route.delete('/upload/:key', async (req, res) => {
   try {
     const { key } = req.params;
+    console.log('\n', key);
     const keyS3 = key.split('.')[0];
     await deleteFile(keyS3);
     res.send(true);
