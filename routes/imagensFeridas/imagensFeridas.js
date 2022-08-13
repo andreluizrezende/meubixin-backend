@@ -83,7 +83,7 @@ route.delete('/imagens_feridasByKey/:key', async (req, res) => {
   try {
     const { key } = req.params;
     console.log('\ndel img ferida');
-    const ds_caminho_server = '/upload/' + key;
+    const ds_caminho_server = key.split('.')[0];
     const resposta = await mob_imagens_feridas.destroy({ where: { ds_caminho_server } });
     console.log('\n', resposta);
     resposta ? res.send(true) : res.send(false);

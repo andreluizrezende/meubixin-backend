@@ -48,7 +48,7 @@ route.post('/upload', upload.single("img"), async (req, res) => {
     await uploadFile(fileStream, file);
 
     const id = Number(req.body.id);
-    const ds_caminho_server = `/upload/${file}.png`;
+    const ds_caminho_server = `${file}`;
     const resposta = await mob_imagens_feridas.update({ ds_caminho_server }, { where: { id } });
 
 
@@ -72,7 +72,7 @@ route.post('/uploadB64', async (req, res) => {
 
     await uploadFile(fileStream, file);
 
-    const ds_caminho_server = `/upload/${file}.png`;
+    const ds_caminho_server = `${file}`;
     const resposta = await mob_imagens_feridas.update({ ds_caminho_server }, { where: { id } });
     resposta[0] ? res.send(ds_caminho_server) : res.send(false);
   } catch (error) {
