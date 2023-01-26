@@ -4,6 +4,17 @@ const models = require('../../models');
 const usuarios = models.mob_usuarios;
 const administradores = models.mob_administradores;
 
+route.post('/usuarioRegister', async (req, res) => {
+  try {
+    const { no_completo, ds_senha,ds_email,nu_telefone_completo,nu_cpf} = req.body;
+    const resposta = await usuarios.create({no_completo, ds_senha,ds_email,nu_telefone_completo,nu_cpf});
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('Erro em /usuarioRegister!');
+    console.log(error.message);
+  }
+});
+
 route.post('/usuarioLogin', async (req, res) => {
   try {
     const { nu_cpf, ds_senha } = req.body;
