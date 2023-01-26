@@ -15,6 +15,18 @@ route.post('/usuarioLogin', async (req, res) => {
   }
 });
 
+route.post('/checkUsuarioCPF', async (req, res) => {
+  console.log("ta no backend")
+  try {
+    const {nu_cpf} = req.body;
+    const resposta = await usuarios.findOne({ where: { nu_cpf} });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('/checkUsuarioCPF');
+    console.log(error.message);
+  }
+});
+
 route.post('/administradorLogin', async (req, res) => {
   try {
     const { mob_usuarios_id } = req.body;
