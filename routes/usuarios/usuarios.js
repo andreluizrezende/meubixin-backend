@@ -3,7 +3,7 @@ const route = express.Router();
 const models = require('../../models');
 const usuarios = models.mob_usuarios;
 const administradores = models.mob_administradores;
-const sendEmail = require('../../utils/sendNewPass')
+const {sendEmail} = require('../../utils/sendNewPass')
 
 route.post('/usuarioRegister', async (req, res) => {
   try {
