@@ -6,7 +6,7 @@ function sendEmail(ds_email, ds_senha){
         service: 'gmail',
         auth: {
           user: 'isisbia14@gmail.com',
-          pass: 'souzapereira3110'
+          pass: 'cmfifhymbvbsaglj'
         }
       });
       
