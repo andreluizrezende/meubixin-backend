@@ -3,6 +3,7 @@ const route = express.Router();
 const models = require('../../models');
 const usuarios = models.mob_usuarios;
 const administradores = models.mob_administradores;
+const sendEmail = require('../../utils/sendNewPass')
 
 route.post('/usuarioRegister', async (req, res) => {
   try {
@@ -64,7 +65,12 @@ route.put('/updateSenha', async (req, res) => {
   try {
     const { nu_cpf, ds_email, ds_senha } = req.body;
     const resposta = await usuarios.update({ ds_senha}, { where: { nu_cpf, ds_email } });
-    resposta[0] ? res.send(true) : res.send(false);
+    if(resposta[0]){
+      res.send(true)
+      sendEmail(ds_email, ds_senha)
+    }else{
+      res.send(false);
+    } 
   } catch (error) {
     console.log('ERRO em /updateSenha');
     console.log(error.message);
