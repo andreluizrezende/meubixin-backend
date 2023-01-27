@@ -60,4 +60,15 @@ route.post('/recuperarSenha', async (req, res) => {
   }
 });
 
+route.put('/updateSenha', async (req, res) => {
+  try {
+    const { nu_cpf, ds_email, ds_senha } = req.body;
+    const resposta = await usuarios.update({ ds_senha}, { where: { nu_cpf, ds_email } });
+    resposta[0] ? res.send(true) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /updateSenha');
+    console.log(error.message);
+  }
+});
+
 module.exports = route;
