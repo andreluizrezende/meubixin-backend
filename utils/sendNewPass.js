@@ -5,7 +5,7 @@ function sendEmail(ds_email, ds_senha){
     var transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
-          user: 'isisbeatris.dev@gmail.com',
+          user: 'isisbia14@gmail.com',
           pass: 'souzapereira3110'
         }
       });
