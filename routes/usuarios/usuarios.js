@@ -64,7 +64,8 @@ route.post('/recuperarSenha', async (req, res) => {
 route.put('/updateSenha', async (req, res) => {
   try {
     const { nu_cpf, ds_email, ds_senha } = req.body;
-    const resposta = await usuarios.update({ ds_senha}, { where: { nu_cpf, ds_email } });
+    const resposta = await usuarios.update({ds_senha}, { where: { nu_cpf, ds_email } });
+    console.log(resposta)
     if(resposta[0]){
       res.send(true)
       sendEmail(ds_email, ds_senha)
