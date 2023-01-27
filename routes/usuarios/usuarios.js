@@ -49,4 +49,15 @@ route.post('/administradorLogin', async (req, res) => {
   }
 });
 
+route.post('/recuperarSenha', async (req, res) => {
+  try {
+    const { nu_cpf, ds_email } = req.body;
+    const resposta = await usuarios.findOne({ where: { nu_cpf, ds_email } });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('Erro em /recuperarSenha!');
+    console.log(error.message);
+  }
+});
+
 module.exports = route;
