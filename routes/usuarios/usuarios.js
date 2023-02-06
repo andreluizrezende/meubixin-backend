@@ -16,6 +16,22 @@ route.post('/usuarioRegister', async (req, res) => {
   }
 });
 
+route.put('/usuarioEdit', async (req, res) => {
+  try {
+    const { no_completo,ds_email,nu_telefone_completo,nu_cpf} = req.body;
+    const resposta = await usuarios.update({no_completo,ds_email,nu_telefone_completo,nu_cpf}, { where: { nu_cpf} });
+    if(resposta[0]){
+      res.send(true)
+    }else{
+      res.send(false);
+    } 
+  } catch (error) {
+    console.log('ERRO em /usuarioEdit');
+    console.log(error.message);
+  }
+});
+
+
 route.post('/usuarioLogin', async (req, res) => {
   try {
     const { nu_cpf, ds_senha } = req.body;
@@ -65,7 +81,6 @@ route.put('/updateSenha', async (req, res) => {
   try {
     const { nu_cpf, ds_email, ds_senha } = req.body;
     const resposta = await usuarios.update({ds_senha}, { where: { nu_cpf, ds_email } });
-    console.log(resposta)
     if(resposta[0]){
       res.send(true)
       sendEmail(ds_email, ds_senha)
