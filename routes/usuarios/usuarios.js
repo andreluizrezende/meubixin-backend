@@ -18,8 +18,8 @@ route.post('/usuarioRegister', async (req, res) => {
 
 route.put('/usuarioEdit', async (req, res) => {
   try {
-    const { no_completo,ds_email,nu_telefone_completo,nu_cpf} = req.body;
-    const resposta = await usuarios.update({no_completo,ds_email,nu_telefone_completo,nu_cpf}, { where: { nu_cpf} });
+    const { no_completo,ds_email,nu_telefone_completo,nu_cpf, ds_senha} = req.body;
+    const resposta = await usuarios.update({no_completo,ds_email,nu_telefone_completo,nu_cpf, ds_senha}, { where: { nu_cpf} });
     if(resposta[0]){
       res.send(true)
     }else{
@@ -44,7 +44,6 @@ route.post('/usuarioLogin', async (req, res) => {
 });
 
 route.post('/checkUsuarioCPF', async (req, res) => {
-  console.log("ta no backend")
   try {
     const {nu_cpf} = req.body;
     const resposta = await usuarios.findOne({ where: { nu_cpf} });
@@ -54,6 +53,7 @@ route.post('/checkUsuarioCPF', async (req, res) => {
     console.log(error.message);
   }
 });
+
 
 route.post('/administradorLogin', async (req, res) => {
   try {
