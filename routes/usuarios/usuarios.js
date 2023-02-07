@@ -21,7 +21,7 @@ route.put('/usuarioEdit', async (req, res) => {
     const { no_completo,ds_email,nu_telefone_completo,nu_cpf, ds_senha} = req.body;
     const resposta = await usuarios.update({no_completo,ds_email,nu_telefone_completo,nu_cpf, ds_senha}, { where: { nu_cpf} });
     if(resposta[0]){
-      res.send(true)
+      res.send(resposta)
     }else{
       res.send(false);
     } 
