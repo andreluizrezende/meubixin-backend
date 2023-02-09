@@ -38,7 +38,7 @@ route.get('/FeridasAnamneseID/:Anamnese_id', async (req, res) => {
     const resposta = await mob_feridas.findAll({
       where: { mob_anamneses_id: Anamnese_id },
       include: [{
-        model: mob_tipo_tecidos
+        model: mob_local_feridas
       }]
     });
     resposta ? res.send(resposta) : res.send(false);
