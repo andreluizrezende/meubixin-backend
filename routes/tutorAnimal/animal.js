@@ -39,9 +39,11 @@ route.get('/animalNome/:no_nome', async (req, res) => {
 });
 
 // Implementação versão 2.0
-route.get('/animalNome/:no_nome/:idTutor', async (req, res) => {
+route.get('/animalNome/:no_nome/:id_tutor', async (req, res) => {
+
   try {
     const { no_nome, id_tutor } = req.params;
+    console.log(no_nome, id_tutor)
     const resposta = await mob_animais.findAll({
      where: { no_nome: { [Op.like]: `${no_nome}%`, mob_tutores_id: id_tutor } }
     });
