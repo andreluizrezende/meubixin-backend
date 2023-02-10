@@ -38,6 +38,20 @@ route.get('/animalNome/:no_nome', async (req, res) => {
   }
 });
 
+// Implementação versão 2.0
+route.get('/animalNome/:no_nome/:idTutor', async (req, res) => {
+  try {
+    const { no_nome, id_tutor } = req.params;
+    const resposta = await mob_animais.findAll({
+     where: { no_nome: { [Op.like]: `${no_nome}%`, mob_tutores_id: id_tutor } }
+    });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /animalNome/:no_nome/:idTutor');
+    console.log(error.message);
+  }
+});
+
 route.get('/animalNomeTutor/:no_completo', async (req, res) => {
   try {
     const { no_completo } = req.params;
