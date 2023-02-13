@@ -172,6 +172,8 @@ route.post("/anamnese_tegumentar", async (req, res) => {
       { transaction: t });
     }
 
+    await t.commit();
+
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     await t.rollback();
