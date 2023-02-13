@@ -2,7 +2,17 @@ const express = require("express");
 const route = express.Router();
 const models = require("../../models");
 const { mob_anamneses } = models;
-const sequelize = require("sequelize");
+const Sequelize = require("sequelize");
+const env = process.env.NODE_ENV || 'development';
+const config = require('../../config/config.json')[env];
+
+
+let sequelize;
+if (config.use_env_variable) {
+  sequelize = new Sequelize(process.env[config.use_env_variable], config);
+} else {
+  sequelize = new Sequelize(config.database, config.username, config.password, config);
+}
 
 //alteração para possibilitar a transição
 const { mob_sistema_oto_tegumentar } = models;
@@ -126,11 +136,26 @@ route.delete("/anamneses/:id", async (req, res) => {
 /// route com transição
 
 route.post("/anamnese_tegumentar", async (req, res) => {
-
+  const t = await sequelize.transaction();
   try {
+    const {
+      mob_usuarios_id,
+      mob_animais_id,
+      ds_temperamento,
+      vl_peso,
+      ds_talhe,
+      ds_raca,
+      ds_trauma,
+      vl_cirurgia,
+      ds_claudicacao,
+      dt_data,
+      ds_pele,
+      ds_orelha,
+      ds_unha,
+    } = req.body;
 
-    const result = await sequelize.transaction( async (t)=>{
-      const {
+    const resposta = await mob_anamneses.create(
+      {
         mob_usuarios_id,
         mob_animais_id,
         ds_temperamento,
@@ -141,45 +166,28 @@ route.post("/anamnese_tegumentar", async (req, res) => {
         vl_cirurgia,
         ds_claudicacao,
         dt_data,
+      },
+      { transaction: t }
+    );
+    
+    let mob_anamneses_id = resposta.id;
+    console.log("resposta", resposta)
+
+    if (resposta) {
+      await mob_sistema_oto_tegumentar.create({
+        mob_anamneses_id,
         ds_pele,
         ds_orelha,
         ds_unha,
-      } = req.body;
+      } ,
+      { transaction: t });
+    }
 
-      const resposta = await mob_anamneses.create(
-        {
-          mob_usuarios_id,
-          mob_animais_id,
-          ds_temperamento,
-          vl_peso,
-          ds_talhe,
-          ds_raca,
-          ds_trauma,
-          vl_cirurgia,
-          ds_claudicacao,
-          dt_data,
-        },
-        { transaction: t }
-      );
+    await t.commit();
 
-      let mob_anamneses_id = resposta.id;
-      console.log("resposta", resposta)
-  
-      if (resposta) {
-        await mob_sistema_oto_tegumentar.create({
-          mob_anamneses_id,
-          ds_pele,
-          ds_orelha,
-          ds_unha,
-        } ,
-        { transaction: t });
-      }
-    
-    });
-
-
-    result ? res.send(resposta) : res.send(false);
+    resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
+    await t.rollback();
     console.log("ERRO em /mob_anamneses");
     console.log(error.message);
   }
