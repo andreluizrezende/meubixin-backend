@@ -126,26 +126,11 @@ route.delete("/anamneses/:id", async (req, res) => {
 /// route com transição
 
 route.post("/anamnese_tegumentar", async (req, res) => {
-  const t = await sequelize.transaction();
-  try {
-    const {
-      mob_usuarios_id,
-      mob_animais_id,
-      ds_temperamento,
-      vl_peso,
-      ds_talhe,
-      ds_raca,
-      ds_trauma,
-      vl_cirurgia,
-      ds_claudicacao,
-      dt_data,
-      ds_pele,
-      ds_orelha,
-      ds_unha,
-    } = req.body;
 
-    const resposta = await mob_anamneses.create(
-      {
+  try {
+
+    const result = await sequelize.transaction( async (t)=>{
+      const {
         mob_usuarios_id,
         mob_animais_id,
         ds_temperamento,
@@ -156,27 +141,45 @@ route.post("/anamnese_tegumentar", async (req, res) => {
         vl_cirurgia,
         ds_claudicacao,
         dt_data,
-      },
-      { transaction: t }
-    );
-    let mob_anamneses_id = resposta.id;
-    console.log("resposta", resposta)
-
-    if (resposta) {
-      await mob_sistema_oto_tegumentar.create({
-        mob_anamneses_id,
         ds_pele,
         ds_orelha,
         ds_unha,
-      } ,
-      { transaction: t });
-    }
+      } = req.body;
 
-    await t.commit();
+      const resposta = await mob_anamneses.create(
+        {
+          mob_usuarios_id,
+          mob_animais_id,
+          ds_temperamento,
+          vl_peso,
+          ds_talhe,
+          ds_raca,
+          ds_trauma,
+          vl_cirurgia,
+          ds_claudicacao,
+          dt_data,
+        },
+        { transaction: t }
+      );
 
-    resposta ? res.send(resposta) : res.send(false);
+      let mob_anamneses_id = resposta.id;
+      console.log("resposta", resposta)
+  
+      if (resposta) {
+        await mob_sistema_oto_tegumentar.create({
+          mob_anamneses_id,
+          ds_pele,
+          ds_orelha,
+          ds_unha,
+        } ,
+        { transaction: t });
+      }
+    
+    });
+
+
+    result ? res.send(resposta) : res.send(false);
   } catch (error) {
-    await t.rollback();
     console.log("ERRO em /mob_anamneses");
     console.log(error.message);
   }
