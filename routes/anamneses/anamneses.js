@@ -3,15 +3,19 @@ const route = express.Router();
 const models = require("../../models");
 const { mob_anamneses } = models;
 const Sequelize = require("sequelize");
-const env = process.env.NODE_ENV || 'development';
-const config = require('../../config/config.json')[env];
-
+const env = process.env.NODE_ENV || "development";
+const config = require("../../config/config.json")[env];
 
 let sequelize;
 if (config.use_env_variable) {
   sequelize = new Sequelize(process.env[config.use_env_variable], config);
 } else {
-  sequelize = new Sequelize(config.database, config.username, config.password, config);
+  sequelize = new Sequelize(
+    config.database,
+    config.username,
+    config.password,
+    config
+  );
 }
 
 //alteração para possibilitar a transição
@@ -169,18 +173,78 @@ route.post("/anamnese_tegumentar", async (req, res) => {
       },
       { transaction: t }
     );
-    
+
     let mob_anamneses_id = resposta.id;
-    console.log("resposta", resposta)
+    console.log("resposta", resposta);
 
     if (resposta) {
-      await mob_sistema_oto_tegumentar.create({
-        mob_anamneses_id,
-        ds_pele,
-        ds_orelha,
-        ds_unha,
-      } ,
-      { transaction: t });
+      await mob_sistema_oto_tegumentar.create(
+        {
+          mob_anamneses_id,
+          ds_pele,
+          ds_orelha,
+          ds_unha,
+        },
+        { transaction: t }
+      );
+    }
+
+    await t.commit();
+
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    await t.rollback();
+    console.log("ERRO em /mob_anamneses");
+    console.log(error.message);
+  }
+});
+
+route.put("/anamnese_tegumentar", async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const {
+      id,
+      sistema_id,
+      mob_usuarios_id,
+      mob_animais_id,
+      ds_temperamento,
+      vl_peso,
+      ds_talhe,
+      ds_raca,
+      ds_trauma,
+      vl_cirurgia,
+      ds_claudicacao,
+      dt_data,
+      ds_pele,
+      ds_orelha,
+      ds_unha,
+    } = req.body;
+
+    const resposta = await mob_anamneses.update(
+      {
+        mob_usuarios_id,
+        mob_animais_id,
+        ds_temperamento,
+        vl_peso,
+        ds_talhe,
+        ds_raca,
+        ds_trauma,
+        vl_cirurgia,
+        ds_claudicacao,
+        dt_data,
+      },
+      { where: { id }, transaction: t }
+    );
+
+    let mob_anamneses_id = resposta.id;
+    console.log("resposta", resposta);
+
+    if (resposta) {
+      const resposta = await mob_sistema_oto_tegumentar.update(
+        { mob_anamneses_id, ds_pele, ds_orelha, ds_unha },
+        { where: { id:sistema_id },
+         transaction: t  }
+      );
     }
 
     await t.commit();
