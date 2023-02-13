@@ -159,11 +159,12 @@ route.post("/anamnese_tegumentar", async (req, res) => {
       },
       { transaction: t }
     );
-    let id = resposta.id;
+    let mob_anamneses_id = resposta.id;
+    console.log("resposta", resposta)
 
     if (resposta) {
       await mob_sistema_oto_tegumentar.create({
-        id,
+        mob_anamneses_id,
         ds_pele,
         ds_orelha,
         ds_unha,
