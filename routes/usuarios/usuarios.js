@@ -31,7 +31,7 @@ route.put('/usuarioEdit', async (req, res) => {
   }
 });
 
-
+//remover em 30 dias
 route.post('/usuarioLogin', async (req, res) => {
   try {
     const { nu_cpf, ds_senha } = req.body;
@@ -39,6 +39,23 @@ route.post('/usuarioLogin', async (req, res) => {
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log('Erro em /usuarioLogin!');
+    console.log(error.message);
+  }
+});
+
+route.post('/usuarioLoginIntegrado', async (req, res) => {
+  try {
+    const { nu_cpf, ds_senha } = req.body;
+    const resposta = await usuarios.findOne({ where: { nu_cpf, ds_senha } });
+    if (resposta) {
+      const resposta_adm = await administradores.findOne({
+        where: { mob_usuarios_id },
+      });
+      resposta_adm ? res.send(JSON.stringify(1)) : res.send(JSON.stringify(0));
+    }
+    else res.send(false);
+  } catch (error) {
+    console.log('Erro em /usuarioLoginIntegrado!');
     console.log(error.message);
   }
 });
@@ -54,6 +71,7 @@ route.post('/checkUsuarioCPF', async (req, res) => {
   }
 });
 
+//remover em 30 dias
 
 route.post('/administradorLogin', async (req, res) => {
   try {
