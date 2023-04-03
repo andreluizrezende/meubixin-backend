@@ -51,7 +51,7 @@ route.post('/usuarioLoginIntegrado', async (req, res) => {
       const resposta_adm = await administradores.findOne({
         where: { mob_usuarios_id: resposta.id },
       });
-      resposta_adm ? res.send(resposta_adm) : res.send(resposta);
+      resposta_adm ? res.send(JSON.stringify(3)) : res.send(JSON.stringify(1));
     }
     else res.send(false);
   } catch (error) {
