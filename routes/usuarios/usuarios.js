@@ -49,7 +49,7 @@ route.post('/usuarioLoginIntegrado', async (req, res) => {
     const resposta = await usuarios.findOne({ where: { nu_cpf, ds_senha } });
     if (resposta) {
       const resposta_adm = await administradores.findOne({
-        where: { mob_usuarios_id },
+        where: { mob_usuarios_id: resposta.id },
       });
       resposta_adm ? res.send(JSON.stringify(1)) : res.send(JSON.stringify(0));
     }
