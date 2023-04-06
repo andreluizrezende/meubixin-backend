@@ -54,6 +54,24 @@ route.get('/animalNome/:no_nome/:id_tutor', async (req, res) => {
   }
 });
 
+// Implementação versão 2.0
+
+route.delete('/deleteAnimal/:id_animal', async (req, res) => {
+
+  try {
+    const { id_animal } = req.params;
+    await mob_animais.destroy({
+     where: { id: id_animal  }
+    }).then(function(rowDeleted){
+      rowDeleted == 1? res.send(true):res.send(false)
+    })
+
+  } catch (error) {
+    console.log('ERRO em /deleteAnimal/:id_animal');
+    console.log(error.message);
+  }
+});
+
 route.get('/animalNomeTutor/:no_completo', async (req, res) => {
   try {
     const { no_completo } = req.params;
