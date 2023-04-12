@@ -104,6 +104,21 @@ route.get('/animalCpf/:nu_cpf', async (req, res) => {
   }
 });
 
+route.get('/animal/:id_tutor/:no_animal', async (req, res) => {
+  try {
+    const { id_tutor, no_animal } = req.params;
+    const resposta = await mob_animais.findAll({
+
+        where: {mob_tutores_id: id_tutor, no_nome: no_animal  }
+      
+    });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /tutorCpf');
+    console.log(error.message);
+  }
+});
+
 route.post('/animais', async (req, res) => {
   try {
     const { no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade, mob_tutores_id } = req.body;
