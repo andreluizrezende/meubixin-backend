@@ -3,6 +3,7 @@ const app = express();
 const cors = require('cors');
 const PORT = process.env.PORT || 3000;
 
+
 // middlewares
 app.use(cors());
 app.use(express.static('uploads'));
@@ -30,26 +31,29 @@ const rotaManejo = require('./routes/manejo/manejo');
 const rotaFeridas = require('./routes/feridas/feridas');
 const rotaImagemFeridas = require('./routes/imagensFeridas/imagensFeridas');
 const rotaUpload = require('./routes/uploadImagens/upload');
+const adminRoutes = require('./routes/admin/index');
 
-app.use('/', rotaInicial);
-app.use('/', rotaUsuarios);
-app.use('/', rotaLocalFeridas);
-app.use('/', rotaQtdExsudatos);
-app.use('/', rotaTipoExsudato);
-app.use('/', rotaTipoSintomas);
-app.use('/', rotaTipoTecidos);
-app.use('/', rotaTutores);
-app.use('/', rotaAnimais);
-app.use('/', rotaAnamneses);
-app.use('/', rotaSistemaDigestorio);
-app.use('/', rotaSistemaCardioRespiratorio);
-app.use('/', rotaSistemaGenitoUrinario);
-app.use('/', rotaSistemaNervosoLocomotor);
-app.use('/', rotaSistemaOtoTegumentar);
-app.use('/', rotaAntecedentesMorbidos);
-app.use('/', rotaManejo);
-app.use('/', rotaFeridas);
-app.use('/', rotaImagemFeridas);
-app.use('/', rotaUpload);
+app.use('/admin', adminRoutes);
+app.use(rotaInicial);
+app.use(rotaUsuarios);
+app.use(rotaLocalFeridas);
+app.use(rotaQtdExsudatos);
+app.use(rotaTipoExsudato);
+app.use(rotaTipoSintomas);
+app.use(rotaTipoTecidos);
+app.use(rotaTutores);
+app.use(rotaAnimais);
+app.use(rotaAnamneses);
+app.use(rotaSistemaDigestorio);
+app.use(rotaSistemaCardioRespiratorio);
+app.use(rotaSistemaGenitoUrinario);
+app.use(rotaSistemaNervosoLocomotor);
+app.use(rotaSistemaOtoTegumentar);
+app.use(rotaAntecedentesMorbidos);
+app.use(rotaManejo);
+app.use(rotaFeridas);
+app.use(rotaImagemFeridas);
+app.use(rotaUpload);
+
 
 app.listen(PORT, () => console.log(`running on port: ${PORT}`));

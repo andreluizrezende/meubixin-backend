@@ -6,7 +6,9 @@ const Op = require('sequelize').Op;
 
 route.get('/animais', async (req, res) => {
   try {
-    const resposta = await mob_animais.findAll();
+    const resposta = await mob_animais.findAll({
+      order: [['no_nome', 'ASC']]
+    });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log('ERRO em /mob_animais');
