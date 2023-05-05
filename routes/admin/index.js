@@ -2,7 +2,8 @@ const express = require('express');
 const route = express.Router();
 
 const Sequelize = require('sequelize');
-const config = require("../../config/config.json")["development"];
+const env = process.env.NODE_ENV || "development";
+const config = require("../../config/config.json")[env];
 let sequelize = new Sequelize(config)
 
 route.get('/gettables', (req, res) => {
