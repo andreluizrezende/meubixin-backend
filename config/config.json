@@ -1,9 +1,9 @@
 {
   "development": {
     "username": "root",
-    "password": null,
+    "password": "123456",
     "database": "cicatribiovet",
-    "host": "127.0.0.1",
+    "host": "127.0.0.2",
     "dialect": "mysql",
     "quoteIdentifiers": false
   },
