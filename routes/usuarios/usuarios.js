@@ -6,7 +6,7 @@ const administradores = models.mob_administradores;
 const {sendEmail} = require('../../utils/sendNewPass');
 const mob_animais = require('../../models/mob_animais');
 const Sequelize = require('sequelize');
-const config = require("../../config/config.json")["development"];
+const config = require("../../config/config.json")["production"];
 let sequelize = new Sequelize(config)
 
 route.post('/usuarioRegister', async (req, res) => {
@@ -117,13 +117,13 @@ route.put('/updateSenha', async (req, res) => {
 
 route.get('/mocks', async (req, res) => {
   try {
-    const tipoFeridas = await sequelize.query('select * from mob_tipo_feridas', { type: sequelize.QueryTypes.SELECT });
-    const tipoPelagem = await sequelize.query('select * from mob_tipo_pelagem', { type: sequelize.QueryTypes.SELECT });
+    // const tipoFeridas = await sequelize.query('select * from mob_tipo_feridas', { type: sequelize.QueryTypes.SELECT });
+    // const tipoPelagem = await sequelize.query('select * from mob_tipo_pelagem', { type: sequelize.QueryTypes.SELECT });
     const tipoTecidos = await sequelize.query('select id, ds_tipo_tecidos as description from mob_tipo_tecidos', { type: sequelize.QueryTypes.SELECT });
     const localFerida = await sequelize.query('select id, ds_local_feridas as description from mob_local_feridas', { type: sequelize.QueryTypes.SELECT });
-    const tipoEspecies = await sequelize.query('select * from mob_tipo_especies', { type: sequelize.QueryTypes.SELECT });
+    // const tipoEspecies = await sequelize.query('select * from mob_tipo_especies', { type: sequelize.QueryTypes.SELECT });
 
-    res.send({ tipoFeridas, tipoPelagem, tipoTecidos, localFerida, tipoEspecies });
+    res.send({ localFerida, tipoTecidos });
   } catch (error) {
     console.error(error);
     res.status(500).send('Ocorreu um erro ao obter os dados.');
