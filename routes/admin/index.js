@@ -2,7 +2,6 @@ const express = require('express');
 const route = express.Router();
 
 const Sequelize = require('sequelize');
-const env = process.env.NODE_ENV || "development";
 const config = require("../../config/config.json")["production"];
 let sequelize = new Sequelize(config)
 
