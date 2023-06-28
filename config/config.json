@@ -17,9 +17,9 @@
   },
   "production": {
     "username": "admin",
-    "password": "5131fc74",
+    "password": "RgHANCUe",
     "database": "cicatribiovet",
-    "host": "bioskin-mysql.coahrcxutrai.us-east-2.rds.amazonaws.com",
+    "host": "mysql-133499-0.cloudclusters.net",
     "dialect": "mysql",
     "quoteIdentifiers": false
   }
