@@ -12,8 +12,9 @@ let sequelize = new Sequelize(config)
 route.post('/usuarioRegister', async (req, res) => {
   try {
     const { no_completo, ds_senha,ds_email,nu_telefone_completo,nu_cpf} = req.body;
-    const resposta = await usuarios.create({no_completo, ds_senha,ds_email,nu_telefone_completo,nu_cpf});
-    resposta ? res.send(resposta) : res.send(false);
+    await usuarios.create({no_completo, ds_senha,ds_email,nu_telefone_completo,nu_cpf});
+    const resp = await usuarios.findOne({ where: { nu_cpf, ds_senha } });
+    resp? res.send(resp) : res.send(false);
   } catch (error) {
     console.log('Erro em /usuarioRegister!');
     console.log(error.message);
