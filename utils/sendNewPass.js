@@ -20,9 +20,7 @@ function sendEmail(ds_email, ds_senha){
       transporter.sendMail(mailOptions, function(error, info){
         if (error) {
           console.log(error);
-        } else {
-          console.log('Email sent: ' + info.response);
-        }
+        } 
       });
 
 }

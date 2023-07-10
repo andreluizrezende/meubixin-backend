@@ -29,7 +29,6 @@ route.get('/feridas/:id', async (req, res) => {
   } catch (error) {
     console.log('ERRO em /mob_feridas');
     console.log(error.message);
-    console.log('Teste')
   }
 });
 

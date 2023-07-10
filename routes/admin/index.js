@@ -31,7 +31,6 @@ route.put('/updatetable/:table', async (req, res) => {
     const fields = req.body.fields;
     const table = req.params.table;
 
-    console.log("logando: ",fields);
     try {
         const fieldUpdates = Object.entries(fields)
             .filter(([key]) => key !== 'id' && key !== 'createdAt')
@@ -52,8 +51,6 @@ route.put('/updatetable/:table', async (req, res) => {
 route.post('/insertintotable/:table', async (req, res) => {
     const fields = req.body.fields;
     const table = req.params.table;
-
-    console.log("logando: ",fields);
   
     try {
       const filteredFields = Object.entries(fields)

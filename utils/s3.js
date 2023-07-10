@@ -16,8 +16,7 @@ async function uploadFile(Body, Key) {
   const uploadParams = { Bucket, Body, Key }
   try {
     const data = await s3.send(new PutObjectCommand(uploadParams));
-    console.log("Successfully uploaded object: " + uploadParams.Bucket + "/" + uploadParams.Key
-    );
+  
     return data;
   } catch (err) {
     console.log("Error", err);
@@ -40,7 +39,6 @@ async function listFileStream() {
   try {
     const bucketParams = { Bucket }
     const data = await s3.send(new ListObjectsCommand(bucketParams));
-    console.log("Success", data);
     return data;
   } catch (err) {
     console.log("Error", err);
@@ -55,10 +53,7 @@ async function deleteFile(Key) {
   }
   try {
     const data = await s3.send(new DeleteObjectCommand(params));
-    console.log(
-      "Successfully delete object: " +
-      params.Bucket + "/" + params.Key
-    );
+
     return data;
   } catch (err) {
     console.log("Error", err);
@@ -68,7 +63,6 @@ async function deleteFile(Key) {
 const listBuckets = async () => {
   try {
     const data = await s3.send(new ListBucketsCommand({}));
-    console.log("Success", data.Buckets);
     if (data) return data.Buckets; else return false;
   } catch (err) {
     console.log("Error", err);
@@ -79,7 +73,6 @@ const createBucket = async name => {
   const bucketParams = { Bucket: name }
   try {
     const data = await s3.send(new CreateBucketCommand(bucketParams));
-    console.log("Success", data);
     return data;
   } catch (err) {
     console.log("Error", err);
