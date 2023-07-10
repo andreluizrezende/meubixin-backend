@@ -16,8 +16,8 @@
     "quoteIdentifiers": false
   },
   "production": {
-    "username": "admin",
-    "password": "RgHANCUe",
+    "username": "cicatribiodev",
+    "password": "xH12#%$&8*LoP",
     "database": "cicatribiovet",
     "host": "mysql-133499-0.cloudclusters.net",
     "dialect": "mysql",
