@@ -48,6 +48,53 @@ route.get('/FeridasAnamneseID/:Anamnese_id', async (req, res) => {
   }
 });
 
+route.get('/FeridasAnamneseID/:Anamnese_id', async (req, res) => {
+  try {
+    const { Anamnese_id } = req.params;
+    const resposta = await mob_feridas.findAll({
+      where: { mob_anamneses_id: Anamnese_id },
+      include: [{
+        model: mob_local_feridas
+      }]
+    });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /sistema_digestorioAnamneseID');
+    console.log(error.message);
+  }
+});
+
+
+
+route.get('/FeridasDimensao/:ferida_id', async (req, res) => {
+  try {
+    const { ferida_id } = req.params;
+
+    const consulta = `
+      SELECT
+        a.vl_dimensao_ia AS dimensao_ia,
+        a.mob_imagens_feridas_id
+      FROM
+        srv_imagens_feridas a,
+        mob_imagens_feridas b
+      WHERE
+        a.mob_imagens_feridas_id = b.id
+        AND b.mob_feridas_id = :ferida_id
+    `;
+
+    const resposta = await sequelize.query(consulta, {
+      replacements: { ferida_id: ferida_id },
+      type: Sequelize.QueryTypes.SELECT
+    });
+
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log('ERRO em /FeridasDimensao');
+    console.log(error.message);
+  }
+});
+
+
 route.post('/feridas', async (req, res) => {
   try {
     const { mob_anamneses_id, mob_tipo_exsudatos_id, mob_tipo_sintomas_id, mob_local_feridas_id, mob_tipo_tecidos_id, mob_qtd_exsudatos_id, vl_comprimento, vl_largura } = req.body;
