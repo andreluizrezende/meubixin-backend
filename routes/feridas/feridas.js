@@ -71,21 +71,16 @@ route.get('/FeridasDimensao/:ferida_id', async (req, res) => {
   try {
     const { ferida_id } = req.params;
 
-    const consulta = `
-      SELECT
-        a.vl_dimensao_ia AS dimensao_ia,
-        a.mob_imagens_feridas_id
-      FROM
-        srv_imagens_feridas a,
-        mob_imagens_feridas b
-      WHERE
-        a.mob_imagens_feridas_id = b.id
-        AND b.mob_feridas_id = :ferida_id
-    `;
-
-    const resposta = await sequelize.query(consulta, {
-      replacements: { ferida_id: ferida_id },
-      type: Sequelize.QueryTypes.SELECT
+    const resposta = await srv_imagens_feridas.findAll({
+      attributes: [
+        'vl_dimensao_ia',
+        'mob_imagens_feridas_id'
+      ],
+      include: [{
+        model: mob_imagens_feridas,
+        where: { mob_feridas_id: ferida_id }
+      }],
+      raw: true // Retorna o resultado em formato JSON plano
     });
 
     resposta ? res.send(resposta) : res.send(false);
