@@ -71,19 +71,24 @@ route.get('/FeridasDimensao/:ferida_id', async (req, res) => {
   try {
     const { ferida_id } = req.params;
 
-    const resposta = await srv_imagens_feridas.findAll({
-      attributes: [
-        'vl_dimensao_ia',
-        'mob_imagens_feridas_id'
-      ],
-      include: [{
-        model: mob_imagens_feridas,
-        where: { mob_feridas_id: ferida_id }
-      }],
-      raw: true // Retorna o resultado em formato JSON plano
+    const consulta = `
+      SELECT
+        a.vl_dimensao_ia AS vl_dimensao_ia,
+        a.mob_imagens_feridas_id AS mob_imagens_feridas_id
+      FROM
+        srv_imagens_feridas a
+      INNER JOIN
+        mob_imagens_feridas b ON a.mob_imagens_feridas_id = b.id
+      WHERE
+        b.mob_feridas_id = :ferida_id
+    `;
+
+    const resultado = await Sequelize.query(consulta, {
+      replacements: { ferida_id },
+      type: Sequelize.QueryTypes.SELECT
     });
 
-    resposta ? res.send(resposta) : res.send(false);
+    resultado ? res.send(resultado) : res.send(false);
   } catch (error) {
     console.log('ERRO em /FeridasDimensao');
     console.log(error.message);
