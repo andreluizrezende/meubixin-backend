@@ -1,7 +1,7 @@
 const express = require('express');
 const route = express.Router();
 const models = require('../../models');
-const { mob_feridas, mob_local_feridas, mob_tipo_exsudatos, mob_qtd_exsudatos, mob_tipo_sintomas, mob_tipo_tecidos } = models;
+const { mob_feridas, mob_local_feridas, mob_tipo_exsudatos, mob_qtd_exsudatos, mob_tipo_sintomas, mob_tipo_tecidos, srv_imagens_feridas } = models;
 const { Sequelize, Op } = require('sequelize');
 
 route.get('/feridas', async (req, res) => {
@@ -71,24 +71,19 @@ route.get('/FeridasDimensao/:ferida_id', async (req, res) => {
   try {
     const { ferida_id } = req.params;
 
-    const consulta = `
-      SELECT
-        a.vl_dimensao_ia AS vl_dimensao_ia,
-        a.mob_imagens_feridas_id AS mob_imagens_feridas_id
-      FROM
-        srv_imagens_feridas a
-      INNER JOIN
-        mob_imagens_feridas b ON a.mob_imagens_feridas_id = b.id
-      WHERE
-        b.mob_feridas_id = :ferida_id
-    `;
-
-    const resultado = await Sequelize.query(consulta, {
-      replacements: { ferida_id },
-      type: Sequelize.QueryTypes.SELECT
+    const resposta = await srv_imagens_feridas.findAll({
+      attributes: [
+        'vl_dimensao_ia',
+        'mob_imagens_feridas_id'
+      ],
+      include: [{
+        model: mob_imagens_feridas,
+        where: { mob_feridas_id: ferida_id }
+      }],
+      raw: true 
     });
 
-    resultado ? res.send(resultado) : res.send(false);
+    resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log('ERRO em /FeridasDimensao');
     console.log(error.message);
