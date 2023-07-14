@@ -1,7 +1,7 @@
 const express = require('express');
 const route = express.Router();
 const models = require('../../models');
-const { mob_feridas, mob_local_feridas, mob_tipo_exsudatos, mob_qtd_exsudatos, mob_tipo_sintomas, mob_tipo_tecidos, srv_imagens_feridas } = models;
+const { mob_feridas, mob_local_feridas, mob_tipo_exsudatos, mob_qtd_exsudatos, mob_tipo_sintomas, mob_tipo_tecidos, srv_imagens_feridas, mob_imagens_feridas } = models;
 const { Sequelize, Op } = require('sequelize');
 
 route.get('/feridas', async (req, res) => {
