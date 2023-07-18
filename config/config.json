@@ -22,6 +22,7 @@
     "host": "mysql-133499-0.cloudclusters.net",
     "dialect": "mysql",
     "port": 10042,
+    "logging": false,
     "quoteIdentifiers": false
   }
 }
