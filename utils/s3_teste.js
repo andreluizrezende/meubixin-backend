@@ -13,15 +13,21 @@ const s3 = new S3Client({
 
 // uploads a file to s3
 async function uploadFile(Body, Key) {
-  console.log("Body", Body) 
-  const uploadParams = { Bucket, Body, Key }
-  try {
-    const data = await s3.send(new PutObjectCommand(uploadParams));
-  
-    return data;
-  } catch (err) {
-    console.log("Error", err);
-  }
+  const uploadParams = { Bucket, Body, Key };
+
+  return new Promise((resolve, reject) => {
+    console.log("Iniciando envio assíncrono...");
+
+    s3.send(new PutObjectCommand(uploadParams))
+      .then(data => {
+        console.log("Upload concluído:", data);
+        resolve(data);
+      })
+      .catch(err => {
+        console.log("Erro durante o upload:", err);
+        reject(err);
+      });
+  });
 }
 
 // downloads a file from s3

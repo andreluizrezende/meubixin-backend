@@ -1,7 +1,8 @@
 const express = require('express');
 const route = express.Router();
 const upload = require('../../utils/multer');
-const { getFileStream, listBuckets, createBucket, uploadFile, listFileStream, deleteFile } = require('../../utils/s3');
+const { getFileStream, listBuckets, createBucketlistFileStream, deleteFile } = require('../../utils/s3');
+const {uploadFile } = require('../../utils/s3_teste');
 const fs = require('fs');
 const path = require('path');
 const models = require('../../models');
