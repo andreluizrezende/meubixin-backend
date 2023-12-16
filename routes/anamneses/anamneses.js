@@ -85,6 +85,7 @@ route.post("/anamneses", async (req, res) => {
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log("ERRO em /mob_anamneses");
+    
     console.log(error.message);
   }
 });
@@ -192,14 +193,17 @@ route.post("/anamnese_tegumentar", async (req, res) => {
     await t.commit();
 
     resposta ? res.send(resposta) : res.send(false);
+
   } catch (error) {
     await t.rollback();
     console.log("ERRO em /mob_anamneses");
     console.log(error.message);
+   
   }
 });
 
 route.put("/anamnese_tegumentar", async (req, res) => {
+
   const t = await sequelize.transaction();
   try {
     const {
