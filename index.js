@@ -31,7 +31,10 @@ const rotaManejo = require('./routes/manejo/manejo');
 const rotaFeridas = require('./routes/feridas/feridas');
 const rotaImagemFeridas = require('./routes/imagensFeridas/imagensFeridas');
 const rotaUpload = require('./routes/uploadImagens/upload');
+const rotaTipoVacinas = require('./routes/tabelasControle/tipoVacinas')
+const rotaTipoVermifugos = require('./routes/tabelasControle/tipoVermifugos')
 const adminRoutes = require('./routes/admin/index');
+const rotaProtocolos = require('./routes/protocolos/protocolos')
 
 app.use('/admin', adminRoutes);
 app.use(rotaInicial);
@@ -54,6 +57,8 @@ app.use(rotaManejo);
 app.use(rotaFeridas);
 app.use(rotaImagemFeridas);
 app.use(rotaUpload);
-
+app.use(rotaTipoVacinas);
+app.use(rotaTipoVermifugos);
+app.use(rotaProtocolos);
 
 app.listen(PORT, () => console.log(`running on port: ${PORT}`));
