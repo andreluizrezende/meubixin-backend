@@ -125,5 +125,32 @@ route.get("/mob_protocolos/:animal_id", async (req, res) => {
       res.status(500).send({ error: "Erro ao atualizar a dose" });
     }
   });
+
+  route.delete("/mob_protocolos/:protocolo_id", async (req, res) => {
+    try {
+      const { protocolo_id } = req.params;
+  
+      // Excluir todas as doses associadas ao protocolo_id fornecido
+      await mob_protocolos_agendas.destroy({
+        where: { mob_protocolos_id: protocolo_id },
+      });
+  
+      // Excluir o protocolo
+      const deletedProtocolo = await mob_protocolos.destroy({
+        where: { id: protocolo_id },
+      });
+  
+      if (deletedProtocolo === 0) {
+        return res.status(404).send({ error: "Protocolo não encontrado" });
+      }
+  
+      res.status(200).send({ message: "Protocolo deletado com sucesso" });
+    } catch (error) {
+      console.log("ERRO em /mob_protocolos/:protocolo_id");
+      console.log(error.message);
+      res.status(500).send({ error: "Erro ao deletar o protocolo" });
+    }
+  });
+  
   
 module.exports = route;
