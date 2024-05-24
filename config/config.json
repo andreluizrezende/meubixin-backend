@@ -18,7 +18,7 @@
   "production": {
     "username": "cicatribiodev",
     "password": "xH12#%$&8*LoP",
-    "database": "cicatribiovet_dev",
+    "database": "cicatribiovet",
     "host": "mysql-133499-0.cloudclusters.net",
     "dialect": "mysql",
     "port": 10042,
