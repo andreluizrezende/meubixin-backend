@@ -122,8 +122,9 @@ route.get('/animal/:id_tutor/:no_animal', async (req, res) => {
 
 route.post('/animais', async (req, res) => {
   try {
-    const { no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade, mob_tutores_id } = req.body;
-    const resposta = await mob_animais.create({ no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade, mob_tutores_id });
+    const { no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade,vl_peso, mob_tutores_id } = req.body;
+    console.log("Print vl_peso", vl_peso)
+    const resposta = await mob_animais.create({ no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade,vl_peso, mob_tutores_id });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log('ERRO em /mob_animais');
@@ -133,8 +134,8 @@ route.post('/animais', async (req, res) => {
 
 route.put('/animais', async (req, res) => {
   try {
-    const { id, no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade, mob_tutores_id } = req.body;
-    const resposta = await mob_animais.update({ no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade, mob_tutores_id }, { where: { id } });
+    const { id, no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade,vl_peso, mob_tutores_id } = req.body;
+    const resposta = await mob_animais.update({ no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade,vl_peso, mob_tutores_id }, { where: { id } });
     resposta[0] ? res.send(true) : res.send(false);
   } catch (error) {
     console.log('ERRO em /mob_animais');

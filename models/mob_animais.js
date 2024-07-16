@@ -20,7 +20,12 @@ module.exports = (sequelize, DataTypes) => {
     ds_especie: DataTypes.STRING,
     ds_sexo: DataTypes.STRING,
     ds_pelagem: DataTypes.STRING,
-    vl_idade: DataTypes.INTEGER
+    vl_idade: DataTypes.INTEGER,
+    vl_peso: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+      defaultValue: 0
+    },
   }, {
     sequelize,
     modelName: 'mob_animais',
