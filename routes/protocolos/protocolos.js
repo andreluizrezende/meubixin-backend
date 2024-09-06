@@ -151,6 +151,19 @@ route.get("/mob_protocolos/:animal_id", async (req, res) => {
       res.status(500).send({ error: "Erro ao deletar o protocolo" });
     }
   });
+
+  route.get("/imagens_protocolos/:dose_id", async (req, res) => {
+    try {
+      const { dose_id } = req.params;
+      const resposta = await mob_protocolos_agendas.findAll({
+        where: { id:dose_id },
+      });
+      resposta ? res.send(resposta) : res.send(false);
+    } catch (error) {
+      console.log("/imagens_protocolos/:dose_id");
+      console.log(error.message);
+    }
+  });
   
   
 module.exports = route;

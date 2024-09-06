@@ -25,6 +25,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 0 // Valor padrão para indicar que não está concluído
+    },
+    ds_caminho_server:{
+      type: DataTypes.STRING,
+      allowNull: true
+
     }
   }, {
     sequelize,
