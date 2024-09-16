@@ -8,7 +8,8 @@ const mob_animais = require("../../models/mob_animais");
 const Sequelize = require("sequelize");
 const config = require("../../config/config.json")["production"];
 const bcrypt = require("bcrypt");
-
+const mob_logs = models.mob_logs
+const moment = require('moment-timezone');
 let sequelize = new Sequelize(config);
 
 route.post("/usuarioRegister", async (req, res) => {
@@ -86,6 +87,9 @@ route.post("/usuarioLogin", async (req, res) => {
 
       if (isMatch) {
         console.log("resposta do login, ", user);
+        const currentDateTime = moment().tz('America/Sao_Paulo').format('YYYY-MM-DD HH:mm:ss');
+        console.log("Dados enviados pro log: ", "Autenticação", "Cpf:", nu_cpf, "dt_acesso:", currentDateTime )
+        await mob_logs.create({ds_funcionalidade:"Autenticação", nu_cpf, dt_acesso: currentDateTime})
         res.send(user);
       } else {
         res.send(false);
