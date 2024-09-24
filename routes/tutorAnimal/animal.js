@@ -124,7 +124,6 @@ route.post('/animais', async (req, res) => {
   try {
     let { no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade, vl_peso, mob_tutores_id } = req.body;
 
-
     if (vl_peso) {
       vl_peso = parseFloat(vl_peso.replace(",", "."));
     }
@@ -143,7 +142,7 @@ route.post('/animais', async (req, res) => {
 
 route.put('/animais', async (req, res) => {
   try {
-    const { id, no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade,vl_peso, mob_tutores_id } = req.body;
+    let{ id, no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade,vl_peso, mob_tutores_id } = req.body;
     if (vl_peso) {
       vl_peso = parseFloat(vl_peso.replace(",", "."));
     }
