@@ -107,15 +107,32 @@ route.post("/usuarioLoginIntegrado", async (req, res) => {
   try {
     const { nu_cpf, ds_senha } = req.body;
     const user = await usuarios.findOne({ where: { nu_cpf } });
+    
     if (user) {
       const isMatch = await bcrypt.compare(ds_senha, user.ds_senha);
+      
       if (!isMatch) {
-        res.send(false);
+        return res.send(false);
       }
+      
       const resposta_adm = await administradores.findOne({
         where: { mob_usuarios_id: user.id },
       });
-      resposta_adm ? res.send(JSON.stringify(3)) : res.send(JSON.stringify(1));
+
+      console.log("RESPOSTA", resposta_adm)
+      
+      if (resposta_adm != null) {
+        // Verifica se o campo ds_perfil é igual a 'parceiro'
+        if (resposta_adm.ds_perfil === 'parceiro') {
+          return res.send(JSON.stringify(2));
+        }
+        
+        // Caso contrário, retorna 3 para administradores comuns
+        return res.send(JSON.stringify(3));
+      } else {
+        // Retorna 1 para usuários comuns
+        return res.send(JSON.stringify(1));
+      }
     } else {
       res.send(false);
     }
@@ -124,6 +141,7 @@ route.post("/usuarioLoginIntegrado", async (req, res) => {
     console.log(error.message);
   }
 });
+
 
 route.post("/checkUsuarioCPF", async (req, res) => {
   try {

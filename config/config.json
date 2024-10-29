@@ -10,7 +10,7 @@
   "test": {
     "username": "admin",
     "password": "5131fc74",
-    "database": "cicatribiovet",
+    "database": "cicatribiovet_dev",
     "host": "bioskin-mysql.coahrcxutrai.us-east-2.rds.amazonaws.com",
     "dialect": "mysql",
     "quoteIdentifiers": false
