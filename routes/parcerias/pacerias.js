@@ -20,7 +20,7 @@ if (config.use_env_variable) {
 
 // Rota para criar uma nova parceria
 route.post("/parcerias", async (req, res) => {
-    console.log("CHou aqui", req.body)
+  console.log("CHou aqui", req.body);
   try {
     const {
       mob_usuarios_id,
@@ -29,6 +29,9 @@ route.post("/parcerias", async (req, res) => {
       ds_estado,
       ds_cidade,
       nu_cep,
+      nu_telefone_completo,
+      ds_site,
+      ds_instagram,
     } = req.body;
 
     const resposta = await MobParcerias.create({
@@ -38,6 +41,9 @@ route.post("/parcerias", async (req, res) => {
       ds_estado,
       ds_cidade,
       nu_cep,
+      nu_telefone_completo,
+      ds_site,
+      ds_instagram,
     });
 
     resposta ? res.send(resposta) : res.send(false);
@@ -58,9 +64,12 @@ route.put("/parcerias/:id", async (req, res) => {
       ds_estado,
       ds_cidade,
       nu_cep,
+      nu_telefone_completo,
+      ds_site,
+      ds_instagram,
     } = req.body;
 
-    console.log("Dados que chegam para a atualização", req.body)
+    console.log("Dados que chegam para a atualização", req.body);
 
     const resposta = await MobParcerias.update(
       {
@@ -70,6 +79,9 @@ route.put("/parcerias/:id", async (req, res) => {
         ds_estado,
         ds_cidade,
         nu_cep,
+        nu_telefone_completo,
+        ds_site,
+        ds_instagram,
       },
       { where: { id } }
     );
@@ -101,7 +113,7 @@ route.get("/parcerias/usuario/:userId", async (req, res) => {
       where: { mob_usuarios_id: userId },
       order: [["createdAt", "DESC"]],
     });
-    console.log(resposta)
+    console.log(resposta);
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log("ERRO em /mob_parcerias");
@@ -112,11 +124,36 @@ route.get("/parcerias/usuario/:userId", async (req, res) => {
 route.get("/tipo/parcerias", async (req, res) => {
   try {
     const resposta = await mob_tipo_parcerias.findAll();
-    console.log(resposta)
+    console.log(resposta);
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log("ERRO em /tipo/parceirias");
     console.log(error.message);
+  }
+});
+
+// Rota para buscar parcerias pelo estado e cidade
+route.get("/parcerias/localizacao", async (req, res) => {
+  try {
+    const { estado, cidade } = req.query;
+
+    if (!estado || !cidade) {
+      return res.status(400).send({ message: "Estado e cidade são obrigatórios." });
+    }
+
+    const resposta = await MobParcerias.findAll({
+      where: {
+        ds_estado: estado,
+        ds_cidade: cidade,
+      },
+      order: [["createdAt", "DESC"]],
+    });
+
+    resposta.length ? res.send(resposta) : res.send([]);
+  } catch (error) {
+    console.log("ERRO em /parcerias/localizacao");
+    console.log(error.message);
+    res.status(500).send({ message: "Erro ao buscar parcerias por localização." });
   }
 });
 

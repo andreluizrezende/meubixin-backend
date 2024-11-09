@@ -32,6 +32,11 @@ module.exports = (sequelize, DataTypes) => {
     ds_protocolo: {
       type: DataTypes.STRING,
       allowNull: false
+    },
+    mob_protocolos_saude_id:{
+      type: DataTypes.INTEGER,
+      allowNull: false
+
     }
   }, {
     sequelize,

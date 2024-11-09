@@ -5,68 +5,70 @@ const { mob_protocolos, mob_protocolos_agendas } = models;
 const moment = require("moment")
 
 route.post("/mob_protocolos", async (req, res) => {
-    try {
-      const protocoloData = req.body;
-  
-      // Extrair as informações do protocoloData
-      const {
-        mob_animal_id,
-        nu_doses,
-        nu_intervalo_dias,
-        st_tipo_protocolo,
-        ds_protocolo,
-      } = protocoloData;
-  
-      // Criar um novo protocolo no banco de dados
-      const novoProtocolo = await mob_protocolos.create({
-        mob_animal_id,
-        nu_doses,
-        nu_intervalo_dias,
-        st_tipo_protocolo,
-        ds_protocolo,
+  try {
+    const protocoloData = req.body;
+
+    // Extrair as informações do protocoloData incluindo o novo campo
+    const {
+      mob_animal_id,
+      nu_doses,
+      nu_intervalo_dias,
+      st_tipo_protocolo,
+      ds_protocolo,
+      mob_protocolos_saude_id  // Novo campo adicionado
+    } = protocoloData;
+
+    // Criar um novo protocolo no banco de dados com o novo campo
+    const novoProtocolo = await mob_protocolos.create({
+      mob_animal_id,
+      nu_doses,
+      nu_intervalo_dias,
+      st_tipo_protocolo,
+      ds_protocolo,
+      mob_protocolos_saude_id  // Novo campo adicionado
+    });
+
+    // Criação dos registros em mob_protocolos_agendas
+    const agendas = [];
+    const dataAtual = new Date();
+
+    // Verificar se é uma única dose ou múltiplas doses
+    if (nu_doses === 1) {
+      agendas.push({
+        mob_protocolos_id: novoProtocolo.id,
+        dt_data_aplicacao: dataAtual,
+        st_concluido: 1, // Marcar como concluído
       });
-  
-      // Criação dos registros em mob_protocolos_agendas
-      const agendas = [];
-      const dataAtual = new Date();
-  
-      // Verificar se é uma única dose ou múltiplas doses
-      if (nu_doses === 1) {
+    } else {
+      // Primeira dose
+      agendas.push({
+        mob_protocolos_id: novoProtocolo.id,
+        dt_data_aplicacao: dataAtual,
+        st_concluido: 1, // Marcar como concluído
+      });
+
+      // Doses seguintes
+      for (let i = 2; i <= nu_doses; i++) {
+        const dataAplicacao = moment(dataAtual).add(nu_intervalo_dias * (i - 1), 'days').toDate();
         agendas.push({
           mob_protocolos_id: novoProtocolo.id,
-          dt_data_aplicacao: dataAtual,
-          st_concluido: 1, // Marcar como concluído
+          dt_data_aplicacao: dataAplicacao,
+          st_concluido: 0, // Marcar como não concluído
         });
-      } else {
-        // Primeira dose
-        agendas.push({
-          mob_protocolos_id: novoProtocolo.id,
-          dt_data_aplicacao: dataAtual,
-          st_concluido: 1, // Marcar como concluído
-        });
-  
-        // Doses seguintes
-        for (let i = 2; i <= nu_doses; i++) {
-          const dataAplicacao = moment(dataAtual).add(nu_intervalo_dias * (i - 1), 'days').toDate();
-          agendas.push({
-            mob_protocolos_id: novoProtocolo.id,
-            dt_data_aplicacao: dataAplicacao,
-            st_concluido: 0, // Marcar como não concluído
-          });
-        }
       }
-  
-      // Criar os registros em mob_protocolos_agendas
-      await mob_protocolos_agendas.bulkCreate(agendas);
-  
-      // Enviar a resposta com o protocolo criado
-      res.status(201).send(novoProtocolo);
-    } catch (error) {
-      console.log("ERRO em /mob_protocolos");
-      console.log(error.message);
-      res.status(500).send({ error: "Erro ao criar o protocolo" });
     }
-  });
+
+    // Criar os registros em mob_protocolos_agendas
+    await mob_protocolos_agendas.bulkCreate(agendas);
+
+    // Enviar a resposta com o protocolo criado
+    res.status(201).send(novoProtocolo);
+  } catch (error) {
+    console.log("ERRO em /mob_protocolos");
+    console.log(error.message);
+    res.status(500).send({ error: "Erro ao criar o protocolo" });
+  }
+});
   
 
 route.get("/mob_protocolos/:animal_id", async (req, res) => {

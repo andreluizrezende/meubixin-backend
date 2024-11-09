@@ -44,6 +44,18 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: false,
       },
+      nu_telefone_completo:{
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+      ds_site:{
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      ds_instagram:{
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
       createdAt: {
         type: DataTypes.DATE,
         allowNull: false,
