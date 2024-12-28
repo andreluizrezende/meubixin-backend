@@ -39,6 +39,7 @@ const rotaParcerias = require('./routes/parcerias/pacerias')
 const rotaEspecies = require('./routes/tabelasControle/tipoEspecie')
 const rotaTipoFeridas = require('./routes/tabelasControle/tipoFeridas')
 const rotaProtocolosSaude = require('./routes/tabelasControle/mob_protocolos_saude')
+const rotaVeterinario = require('./routes/veterinarios/veterinarios')
 
 app.use('/admin', adminRoutes);
 app.use(rotaInicial);
@@ -68,5 +69,6 @@ app.use(rotaParcerias);
 app.use(rotaEspecies);
 app.use(rotaTipoFeridas);
 app.use(rotaProtocolosSaude);
+app.use(rotaVeterinario);
 
 app.listen(PORT, () => console.log(`running on port: ${PORT}`));
