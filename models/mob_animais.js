@@ -19,6 +19,7 @@ module.exports = (sequelize, DataTypes) => {
     mob_veterinarios_id: DataTypes.INTEGER,
     no_nome: DataTypes.STRING,
     ds_especie: DataTypes.STRING,
+    mob_especies_id: DataTypes.INTEGER,
     ds_sexo: DataTypes.STRING,
     ds_pelagem: DataTypes.STRING,
     vl_idade: DataTypes.INTEGER,

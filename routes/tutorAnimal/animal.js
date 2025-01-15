@@ -122,7 +122,7 @@ route.get('/animal/:id_tutor/:no_animal', async (req, res) => {
 
 route.post('/animais', async (req, res) => {
   try {
-    let { no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade, vl_peso, mob_tutores_id, mob_veterinarios_id } = req.body;
+    let { no_nome, ds_especie,mob_especies_id, ds_sexo, ds_pelagem, vl_idade, vl_peso, mob_tutores_id, mob_veterinarios_id } = req.body;
 
     if (vl_peso) {
       vl_peso = parseFloat(vl_peso.replace(",", "."));
@@ -131,7 +131,9 @@ route.post('/animais', async (req, res) => {
       vl_idade = parseFloat(vl_idade.replace(",", "."));
     }
 
-    const resposta = await mob_animais.create({ no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade, vl_peso, mob_tutores_id, mob_veterinarios_id  });
+    console.log(vl_idade)
+
+    const resposta = await mob_animais.create({ no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade, vl_peso, mob_tutores_id, mob_veterinarios_id, mob_especies_id });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log('ERRO em /mob_animais');
