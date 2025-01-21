@@ -131,6 +131,13 @@ route.post('/animais', async (req, res) => {
       vl_idade = parseFloat(vl_idade.replace(",", "."));
     }
 
+    if (Array.isArray(mob_veterinarios_id) && mob_veterinarios_id.length === 0) {
+      mob_veterinarios_id = null;
+    }
+
+    console.log('vet', mob_veterinarios_id)
+
+
     console.log(vl_idade)
 
     const resposta = await mob_animais.create({ no_nome, ds_especie, ds_sexo, ds_pelagem, vl_idade, vl_peso, mob_tutores_id, mob_veterinarios_id, mob_especies_id });
