@@ -1,4 +1,5 @@
 const express = require("express");
+const { OAuth2Client } = require("google-auth-library");
 const route = express.Router();
 const models = require("../../models");
 const usuarios = models.mob_usuarios;
@@ -11,6 +12,9 @@ const bcrypt = require("bcrypt");
 const mob_logs = models.mob_logs
 const moment = require('moment-timezone');
 let sequelize = new Sequelize(config);
+
+const GOOGLE_CLIENT_ID = "874940483095-5gdcvfahp6mhindilb1n5cfrk76huj48.apps.googleusercontent.com";
+const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 route.post("/usuarioRegister", async (req, res) => {
   try {
@@ -59,6 +63,49 @@ route.put("/usuarioEdit", async (req, res) => {
   } catch (error) {
     console.log("ERRO em /usuarioEdit");
     console.log(error.message);
+  }
+});
+
+route.post("/usuarioGoogleLogin", async (req, res) => {
+  try {
+    const { token: idToken } = req.body;
+
+    // Verifica o token recebido do Google
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const email = payload.email;
+
+    let user = await usuarios.findOne({ where: { ds_email: email } });
+
+    if (!user) {
+      // Se o usuário não existe, retorna dados para cadastro
+      return res.json({
+        status: "success",
+        exists: false,
+        user,
+        viaGoogle: true,
+      });
+    }
+
+    // Registra o login no log
+    const currentDateTime = moment()
+      .tz("America/Sao_Paulo")
+      .format("YYYY-MM-DD HH:mm:ss");
+
+    await mob_logs.create({
+      ds_funcionalidade: "Autenticação Google",
+      nu_cpf: user.nu_cpf,
+      dt_acesso: currentDateTime,
+    });
+
+    res.json({ status: "success", exists: true, user });
+  } catch (error) {
+    console.log("Erro no login com Google:", error.message);
+    res.status(400).json({ error: "Falha na autenticação do Google" });
   }
 });
 
