@@ -69,6 +69,7 @@ route.put("/usuarioEdit", async (req, res) => {
 route.post("/usuarioGoogleLogin", async (req, res) => {
   try {
     const { token: idToken } = req.body;
+    console.log("Dados que chegaram", req.body)
 
     // Verifica o token recebido do Google
     const ticket = await client.verifyIdToken({
