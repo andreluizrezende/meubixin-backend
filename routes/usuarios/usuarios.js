@@ -13,7 +13,7 @@ const mob_logs = models.mob_logs
 const moment = require('moment-timezone');
 let sequelize = new Sequelize(config);
 
-const GOOGLE_CLIENT_ID = "867699850241-vg24gdstqbqf1e4823fv88qd5f5oup52.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "867699850241-sfm2tk642at1j3g0anrntcu044ki9h48.apps.googleusercontent.com";
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 route.post("/usuarioRegister", async (req, res) => {
