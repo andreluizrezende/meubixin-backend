@@ -40,12 +40,21 @@ route.post("/usuarioRegister", async (req, res) => {
 
 route.put("/usuarioEdit", async (req, res) => {
   try {
-    const { no_completo, ds_email, nu_telefone_completo, nu_cpf, ds_senha } = req.body;
+    const { no_completo, ds_email, nu_telefone_completo, nu_cpf, ds_senha, st_envia_mensagem } = req.body;
 
-    let updateData = { no_completo, ds_email, nu_telefone_completo, nu_cpf };
+    let updateData = { 
+      no_completo, 
+      ds_email, 
+      nu_telefone_completo, 
+      nu_cpf 
+    };
+
+    // Adiciona o campo st_envia_mensagem se ele foi fornecido
+    if (st_envia_mensagem !== undefined) {
+      updateData.st_envia_mensagem = st_envia_mensagem;
+    }
 
     if (ds_senha) {
-
       const hashedPassword = await bcrypt.hash(ds_senha, 10);
       updateData.ds_senha = hashedPassword;
     }
@@ -254,41 +263,185 @@ route.post("/administradorLogin", async (req, res) => {
 });
 
 route.post("/recuperarSenha", async (req, res) => {
+  console.log('aqui');
   try {
-    const { nu_cpf, ds_email } = req.body;
-    const resposta = await usuarios.findOne({ where: { nu_cpf, ds_email } });
+    const { nu_cpf, ds_email, nu_telefone_completo } = req.body;
+    console.log("passou aqui", req.body);
+    
+    let whereClause = { nu_cpf };
+    console.log("passou aqui 2");
+    
+    // Adiciona o critério de busca baseado no que foi fornecido (email ou telefone)
+    if (ds_email) {
+      whereClause.ds_email = ds_email;
+    } else if (nu_telefone_completo) {
+      // Usaremos uma abordagem diferente para garantir precisão na busca
+      const { Op } = require('sequelize');
+      
+      // Normaliza o número removendo caracteres não numéricos
+      const numeroLimpo = nu_telefone_completo.replace(/\D/g, '');
+      
+      // Verifica se o número tem 11 dígitos (com 9) ou 10 dígitos (sem 9)
+      const temNoveDigitos = numeroLimpo.length === 11 && numeroLimpo[2] === '9';
+      const ddd = numeroLimpo.substring(0, 2);
+      
+      // Abordagem mais segura: buscar todos os usuários com o CPF
+      // e verificar programaticamente o número de telefone
+      whereClause = { nu_cpf };
+      
+      // Fazemos a busca inicial apenas pelo CPF
+      const usuarios_encontrados = await usuarios.findAll({ where: whereClause });
+      
+      // Verificamos cada usuário para ver se o telefone corresponde
+      const usuarioEncontrado = usuarios_encontrados.find(user => {
+        // Normaliza o telefone do banco removendo caracteres não numéricos
+        const telefoneBanco = user.nu_telefone_completo.replace(/\D/g, '');
+        
+        // Caso 1: Números exatamente iguais
+        if (telefoneBanco === numeroLimpo) return true;
+        
+        // Caso 2: Número do banco tem o 9, mas o informado não tem
+        if (temNoveDigitos && telefoneBanco === ddd + numeroLimpo.substring(3)) return true;
+        
+        // Caso 3: Número informado tem o 9, mas o do banco não tem
+        if (!temNoveDigitos && telefoneBanco === ddd + '9' + numeroLimpo.substring(2)) return true;
+        
+        return false;
+      });
+      
+      if (usuarioEncontrado) {
+        return res.send(usuarioEncontrado);
+      } else {
+        return res.send(false);
+      }
+    } else {
+      console.log("Ta sendo retornado aqui");
+      // Se nem email nem telefone foram fornecidos
+      return res.send(false);
+    }
+
+    // Se chegamos aqui, estamos lidando com busca por e-mail
+    console.log(whereClause);
+    console.log('até aqui vem');
+    
+    const resposta = await usuarios.findOne({ where: whereClause });
+    console.log(whereClause);
+    console.log(resposta);
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
     console.log("Erro em /recuperarSenha!");
     console.log(error.message);
+    res.status(500).send('Internal Server Error');
   }
 });
 
 route.put("/updateSenha", async (req, res) => {
+  console.log('ta na rota')
+  console.log(req.body)
+  
   try {
-    const { nu_cpf, ds_email, ds_senha } = req.body;
+    const { nu_cpf, ds_email, nu_telefone_completo, ds_senha } = req.body;
+    console.log(req.body)
 
-    const senha = ds_senha.toString()
+    const senha = ds_senha.toString();
+    const hashedPassword = await bcrypt.hash(senha, 10);
+    
+    let resposta;
+    let whereClause = { nu_cpf };
+    
+    // Verifica qual método foi escolhido (e-mail ou telefone)
+    if (ds_email) {
+      // Recuperação por e-mail
+      whereClause.ds_email = ds_email;
+      
+      resposta = await usuarios.update(
+        { ds_senha: hashedPassword },
+        { where: whereClause }
+      );
+      
+      if (resposta[0]) {
+        res.send(true);
+        sendEmail(ds_email, ds_senha); // Envia e-mail com a nova senha
+      } else {
+        res.send(false);
+      }
+    } else if (nu_telefone_completo) {
+      // Recuperação por telefone
+      whereClause.nu_telefone_completo = nu_telefone_completo;
 
-    const hashedPassword = await bcrypt.hash(senha, 10); 
-
-    const resposta = await usuarios.update(
-      { ds_senha: hashedPassword },
-      { where: { nu_cpf, ds_email } }
-    );
-
-    if (resposta[0]) {
-      res.send(true);
-      sendEmail(ds_email, ds_senha); 
+      console.log(whereClause)
+      
+      resposta = await usuarios.update(
+        { ds_senha: hashedPassword },
+        { where: whereClause }
+      );
+      
+      if (resposta[0]) {
+        // Formata o número para o WhatsApp
+        let telefone = nu_telefone_completo.replace(/\D/g, ''); // Remove todos caracteres não numéricos
+        
+        // Se o telefone tiver DDD + 9 dígitos (formato comum no Brasil), remover o 9 extra
+        if (telefone.length == 11 && telefone[2] == '9') {
+          telefone = telefone.substring(0, 2) + telefone.substring(3);
+        }
+        
+        // Garante que o número está no formato internacional
+        if (telefone.startsWith('0')) {
+          telefone = telefone.substring(1);
+        }
+        if (!telefone.startsWith('55')) {
+          telefone = '55' + telefone;
+        }
+        
+        const to_number = `${telefone}@s.whatsapp.net`;
+        
+        // Prepara a mensagem com a senha em negrito
+        const message = `Sua nova senha de acesso é: ${ds_senha}. Recomendamos que você a altere após o login.`;
+        
+        // Prepara o payload
+        const payload = {
+          "to": to_number,
+          "message": message
+        };
+        
+        try {
+          // Faz a requisição para a API de envio de WhatsApp
+          const axios = require('axios');
+          const whatsappResponse = await axios.post(
+            "https://coral-app-f97ui.ondigitalocean.app/send-message",
+            payload,
+            {
+              headers: {
+                "Content-Type": "application/json"
+              }
+            }
+          );
+          
+          console.log('Resposta do envio de WhatsApp:', whatsappResponse.data);
+          console.log(`Senha alterada para o telefone ${nu_telefone_completo}. Nova senha: ${ds_senha}`);
+          
+          res.send(true);
+        } catch (whatsappError) {
+          console.error('Erro ao enviar mensagem WhatsApp:', whatsappError);
+          // Mesmo com erro no envio do WhatsApp, a senha foi alterada
+          console.log(`Senha alterada para o telefone ${nu_telefone_completo}, mas houve um erro ao enviar a mensagem.`);
+          res.send(true);
+        }
+      } else {
+        console.log('ta aqui')
+        res.send(false);
+      }
     } else {
-      res.send(false);
+      // Nem e-mail nem telefone foram fornecidos
+      res.status(400).send('E-mail ou telefone devem ser fornecidos');
     }
   } catch (error) {
     console.log("ERRO em /updateSenha");
     console.log(error.message);
-    res.status(500).send('Internal Server Error'); 
+    res.status(500).send('Internal Server Error');
   }
 });
+
 route.get("/mocks", async (req, res) => {
   try {
     // const tipoFeridas = await sequelize.query('select * from mob_tipo_feridas', { type: sequelize.QueryTypes.SELECT });

@@ -18,7 +18,11 @@ module.exports = (sequelize, DataTypes) => {
     ds_senha: DataTypes.STRING,
     ds_email: DataTypes.STRING,
     nu_telefone_completo: DataTypes.STRING,
-    nu_cpf: DataTypes.BIGINT
+    nu_cpf: DataTypes.BIGINT,
+    st_envia_mensagem: {
+      type: DataTypes.TINYINT,
+      defaultValue: 0
+    }
   }, {
     sequelize,
     modelName: 'mob_usuarios',
