@@ -12,7 +12,7 @@ const bcrypt = require("bcrypt");
 const mob_logs = models.mob_logs
 const moment = require('moment-timezone');
 let sequelize = new Sequelize(config);
-
+const axios = require('axios')
 const GOOGLE_CLIENT_ID = "867699850241-sfm2tk642at1j3g0anrntcu044ki9h48.apps.googleusercontent.com";
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -405,8 +405,7 @@ route.put("/updateSenha", async (req, res) => {
         };
         
         try {
-          // Faz a requisição para a API de envio de WhatsApp
-          const axios = require('axios');
+
           const whatsappResponse = await axios.post(
             "https://coral-app-f97ui.ondigitalocean.app/send-message",
             payload,
