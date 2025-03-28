@@ -17,6 +17,7 @@ module.exports = (sequelize, DataTypes) => {
   Mob_animais.init({
     mob_tutores_id: DataTypes.INTEGER,
     mob_veterinarios_id: DataTypes.INTEGER,
+    mob_parceiros_id: DataTypes.INTEGER,
     no_nome: DataTypes.STRING,
     ds_especie: DataTypes.STRING,
     mob_especies_id: DataTypes.INTEGER,
