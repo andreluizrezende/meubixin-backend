@@ -121,6 +121,18 @@ route.get("/parcerias/usuario/:userId", async (req, res) => {
   }
 });
 
+// Rota para buscar todas as parcerias de um usuário específico
+route.get("/parcerias", async (req, res) => {
+  try {
+    const resposta = await MobParcerias.findAll();
+    console.log(resposta);
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log("ERRO em /mob_parcerias");
+    console.log(error.message);
+  }
+});
+
 route.get("/tipo/parcerias", async (req, res) => {
   try {
     const resposta = await mob_tipo_parcerias.findAll();
