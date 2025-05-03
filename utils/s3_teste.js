@@ -52,6 +52,27 @@ async function listFileStream() {
   }
 }
 
+async function fileExists(Key) {
+  const params = {
+    Bucket,
+    Key
+  };
+  
+  try {
+    // Tentar obter o objeto - se não existir, vai lançar uma exceção
+    await s3.send(new GetObjectCommand(params));
+    return true;
+  } catch (err) {
+    if (err.name === 'NoSuchKey') {
+      return false;
+    }
+    // Se for outro tipo de erro, relançar
+    console.log("Erro ao verificar existência do arquivo:", err);
+    throw err;
+  }
+}
+
+
 // delete file from s3
 async function deleteFile(Key) {
   let params = {
@@ -92,5 +113,6 @@ module.exports = {
   uploadFile,
   listBuckets,
   createBucket,
-  listFileStream
+  listFileStream,
+  fileExists
 }
