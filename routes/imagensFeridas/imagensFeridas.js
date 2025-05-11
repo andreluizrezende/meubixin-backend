@@ -97,6 +97,47 @@ route.get(
   }
 );
 
+route.get(
+  "/grafico_dimensoes/:mob_animais_id/:mob_usuarios_id/:mob_local_feridas_id",
+  async (req, res) => {
+    try {
+      const {
+        mob_animais_id,
+        mob_usuarios_id,
+        mob_local_feridas_id,
+      } = req.params;
+
+      const query_2 = `
+select  a.vl_dimensao_ia, d.dt_data, d.id from srv_imagens_feridas a, 
+    mob_imagens_feridas b, mob_feridas c, mob_anamneses d  
+    where d.mob_animais_id = ${mob_animais_id} AND
+        d.mob_usuarios_id = ${mob_usuarios_id} AND
+        c.mob_anamneses_id = d.id AND
+        b.mob_feridas_id = c.id AND
+        c.mob_local_feridas_id = ${mob_local_feridas_id} AND
+        a.mob_imagens_feridas_id = b.id
+      ORDER BY d.dt_data DESC
+      LIMIT 5;
+    `;
+
+      const resultado = await sequelize.query(query_2, {
+        type: sequelize.QueryTypes.SELECT,
+      });
+      console.log("Resultado:", resultado);
+
+      if (resultado.length > 0) {
+        res.send(resultado);
+      } else {
+        res.send(false);
+      }
+    } catch (error) {
+      console.log("Erro ao processar a consulta");
+      console.error(error);
+      res.status(500).send("Erro ao buscar imagens de feridas");
+    }
+  }
+);
+
 route.post("/imagens_feridas", async (req, res) => {
   try {
     const {
