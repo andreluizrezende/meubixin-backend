@@ -98,13 +98,14 @@ route.get(
 );
 
 route.get(
-  "/grafico_dimensoes/:mob_animais_id/:mob_usuarios_id/:mob_local_feridas_id",
+  "/grafico_dimensoes/:mob_animais_id/:mob_usuarios_id/:mob_local_feridas_id/:limit",
   async (req, res) => {
     try {
       const {
         mob_animais_id,
         mob_usuarios_id,
         mob_local_feridas_id,
+        limit
       } = req.params;
 
       const query_2 = `
@@ -117,7 +118,7 @@ select  a.vl_dimensao_ia, d.dt_data, d.id from srv_imagens_feridas a,
         c.mob_local_feridas_id = ${mob_local_feridas_id} AND
         a.mob_imagens_feridas_id = b.id
       ORDER BY d.dt_data DESC
-      LIMIT 5;
+      LIMIT ${limit};
     `;
 
       const resultado = await sequelize.query(query_2, {
