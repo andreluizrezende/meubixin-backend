@@ -462,4 +462,63 @@ route.get("/mocks", async (req, res) => {
   }
 });
 
+// Adicione essa rota no seu arquivo de rotas do backend
+route.post("/usuarioLoginGoogle", async (req, res) => {
+  try {
+    const { email } = req.body;
+    console.log("Login Google - Email recebido:", email);
+
+    // Busca usuário pelo email
+    const user = await usuarios.findOne({ where: { ds_email: email } });
+    
+    if (user) {
+      console.log("Usuário encontrado pelo email:", user.id);
+
+      // Log de acesso
+      const currentDateTime = moment().tz('America/Sao_Paulo').format('YYYY-MM-DD HH:mm:ss');
+      console.log("Dados enviados pro log: ", "Autenticação Google", "Email:", email, "dt_acesso:", currentDateTime);
+      await mob_logs.create({ 
+        ds_funcionalidade: "Autenticação Google", 
+        nu_cpf: user.nu_cpf,
+        dt_acesso: currentDateTime 
+      });
+
+      // Verifica o tipo de usuário
+      console.log("Verificando perfil do administrador...");
+      const resposta_adm = await administradores.findOne({
+        where: { mob_usuarios_id: user.id },
+      });
+
+      console.log("Resposta do administrador:", resposta_adm);
+      
+      let userType;
+      if (resposta_adm != null) {
+        if (resposta_adm.ds_perfil === 'parceiro') {
+          console.log("Usuário é um parceiro. Tipo: 2");
+          userType = 2;
+        } else {
+          console.log("Usuário é um administrador comum. Tipo: 3");
+          userType = 3;
+        }
+      } else {
+        console.log("Usuário é comum. Tipo: 1");
+        userType = 1;
+      }
+
+      // Retorna tanto os dados do usuário quanto o tipo
+      res.send({
+        user: user,
+        userType: userType
+      });
+    } else {
+      console.log("Usuário não encontrado para o email:", email);
+      res.send(false);
+    }
+  } catch (error) {
+    console.log("Erro em /usuarioLoginGoogle!");
+    console.log(error.message);
+    res.status(500).send("Erro interno do servidor");
+  }
+});
+
 module.exports = route;
