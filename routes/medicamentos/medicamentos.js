@@ -42,22 +42,19 @@ route.post('/medicamentos', async (req, res) => {
     const dataAtual = new Date();
     
     // Primeira administração (hoje) - MARCADA COMO CONCLUÍDA
-    const primeiraAdministracao = new Date(dataAtual);
-    primeiraAdministracao.setHours(
-      parseInt(ho_administracao_medicamento.split(':')[0]),
-      parseInt(ho_administracao_medicamento.split(':')[1]),
-      0, 0
-    );
+    // Usar moment para evitar problemas de fuso horário
+    const primeiraAdministracao = moment().format('YYYY-MM-DD') + ' ' + ho_administracao_medicamento + ':00';
+    const primeiraAdministracaoDate = moment(primeiraAdministracao, 'YYYY-MM-DD HH:mm:ss').toDate();
     
     agendas.push({
       mob_medicamentos_id: novoMedicamento.id,
-      dt_administracao: primeiraAdministracao,
+      dt_administracao: primeiraAdministracaoDate,
       st_concluido: 1, // ✅ PRIMEIRA ADMINISTRAÇÃO JÁ CONCLUÍDA
     });
 
     // Agendamentos seguintes (não concluídos)
     for (let i = 2; i <= nu_reagendamentos; i++) {
-      const dataAdministracao = moment(primeiraAdministracao)
+      const dataAdministracao = moment(primeiraAdministracaoDate)
         .add(ds_intervalo_administracao * (i - 1), 'hours')
         .toDate();
       
@@ -80,6 +77,7 @@ route.post('/medicamentos', async (req, res) => {
     return res.status(500).json({ message: 'Erro ao criar medicamento.', error });
   }
 });
+
 
 // Atualizar status de conclusão da agenda
 route.put("/medicamentos-agenda/:agenda_id/concluir", async (req, res) => {
