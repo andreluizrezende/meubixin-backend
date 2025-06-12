@@ -39,36 +39,46 @@ route.post('/medicamentos', async (req, res) => {
 
     // Criação dos registros em mob_medicamentos_agenda
     const agendas = [];
-    const dataAtual = new Date();
+    
+    // SOLUÇÃO 1: Usando string direta (mais confiável)
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    
+    // Criar primeira administração como string no formato YYYY-MM-DD HH:MM:SS
+    const primeiraAdministracaoString = `${ano}-${mes}-${dia} ${ho_administracao_medicamento}:00`;
+    
+    console.log('Data string criada:', primeiraAdministracaoString);
     
     // Primeira administração (hoje) - MARCADA COMO CONCLUÍDA
-    // Usar moment para evitar problemas de fuso horário
-    const primeiraAdministracao = moment().format('YYYY-MM-DD') + ' ' + ho_administracao_medicamento + ':00';
-    const primeiraAdministracaoDate = moment(primeiraAdministracao, 'YYYY-MM-DD HH:mm:ss').toDate();
-    
     agendas.push({
       mob_medicamentos_id: novoMedicamento.id,
-      dt_administracao: primeiraAdministracaoDate,
+      dt_administracao: primeiraAdministracaoString, // Usar string diretamente
       st_concluido: 1, // ✅ PRIMEIRA ADMINISTRAÇÃO JÁ CONCLUÍDA
     });
 
     // Agendamentos seguintes (não concluídos)
     for (let i = 2; i <= nu_reagendamentos; i++) {
-      const dataAdministracao = moment(primeiraAdministracaoDate)
+      // Calcular próxima data usando moment mas forçando local
+      const proximaData = moment(primeiraAdministracaoString)
         .add(ds_intervalo_administracao * (i - 1), 'hours')
-        .toDate();
+        .format('YYYY-MM-DD HH:mm:ss');
       
-      console.log(dataAdministracao, "Data a ser inserida");
+      console.log(`${i}ª administração:`, proximaData);
       
       agendas.push({
         mob_medicamentos_id: novoMedicamento.id,
-        dt_administracao: dataAdministracao,
+        dt_administracao: proximaData, // Usar string formatada
         st_concluido: 0, // Próximas administrações não concluídas
       });
     }
 
     // Criar os registros em mob_medicamentos_agenda em lote
     await Mob_medicamentos_agenda.bulkCreate(agendas);
+
+    // Log para debug
+    console.log('Agendas criadas:', JSON.stringify(agendas, null, 2));
 
     // Retornar o novo registro criado
     return res.status(201).json(novoMedicamento);
