@@ -41,7 +41,7 @@ route.post('/medicamentos', async (req, res) => {
     const agendas = [];
     const dataAtual = new Date();
     
-    // Primeira administração (hoje)
+    // Primeira administração (hoje) - MARCADA COMO CONCLUÍDA
     const primeiraAdministracao = new Date(dataAtual);
     primeiraAdministracao.setHours(
       parseInt(ho_administracao_medicamento.split(':')[0]),
@@ -52,10 +52,10 @@ route.post('/medicamentos', async (req, res) => {
     agendas.push({
       mob_medicamentos_id: novoMedicamento.id,
       dt_administracao: primeiraAdministracao,
-      st_concluido: 0, // Primeira administração não concluída
+      st_concluido: 1, // ✅ PRIMEIRA ADMINISTRAÇÃO JÁ CONCLUÍDA
     });
 
-    // Agendamentos seguintes
+    // Agendamentos seguintes (não concluídos)
     for (let i = 2; i <= nu_reagendamentos; i++) {
       const dataAdministracao = moment(primeiraAdministracao)
         .add(ds_intervalo_administracao * (i - 1), 'hours')
@@ -66,7 +66,7 @@ route.post('/medicamentos', async (req, res) => {
       agendas.push({
         mob_medicamentos_id: novoMedicamento.id,
         dt_administracao: dataAdministracao,
-        st_concluido: 0, // Marcar como não concluído
+        st_concluido: 0, // Próximas administrações não concluídas
       });
     }
 
