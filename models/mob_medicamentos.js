@@ -41,6 +41,10 @@ module.exports = (sequelize, DataTypes) => {
     ho_administracao_medicamento: {
       type: DataTypes.TIME,
       allowNull: false
+    },
+    nu_doses: {
+      type: DataTypes.INTEGER,
+      allowNull: false
     }
   }, {
     sequelize,

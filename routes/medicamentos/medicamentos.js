@@ -34,7 +34,8 @@ route.post('/medicamentos', async (req, res) => {
       ds_dosagem,
       ds_observacao,
       ds_intervalo_administracao,
-      ho_administracao_medicamento
+      ho_administracao_medicamento,
+      nu_doses: nu_reagendamentos
     });
 
     // Criação dos registros em mob_medicamentos_agenda
@@ -209,6 +210,7 @@ route.get('/medicamento/:id', async (req, res) => {
 });
 
 // Atualizar medicamento
+// Atualizar medicamento com recriação das agendas
 route.put('/medicamentos/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -218,19 +220,101 @@ route.put('/medicamentos/:id', async (req, res) => {
       ds_dosagem, 
       ds_observacao, 
       ds_intervalo_administracao, 
-      ho_administracao_medicamento 
+      ho_administracao_medicamento,
+      nu_reagendamentos // ← NOVO CAMPO
     } = req.body;
     
+    // Buscar o medicamento atual para obter dados anteriores
+    const medicamentoAtual = await Mob_medicamentos.findOne({ where: { id } });
+    
+    if (!medicamentoAtual) {
+      return res.status(404).json({ message: 'Medicamento não encontrado' });
+    }
+    
+    // Atualizar o registro principal do medicamento
     const [updatedRows] = await Mob_medicamentos.update({
       no_medicamento,
       mob_tipo_via_administracao_id,
       ds_dosagem,
       ds_observacao,
       ds_intervalo_administracao,
-      ho_administracao_medicamento
+      ho_administracao_medicamento,
+      nu_doses: nu_reagendamentos || medicamentoAtual.nu_doses // Usar o novo valor ou manter o atual
     }, { where: { id } });
     
-    updatedRows ? res.send(true) : res.send(false);
+    if (!updatedRows) {
+      return res.status(400).json({ message: 'Erro ao atualizar medicamento' });
+    }
+    
+    // Verificar se houve mudança no horário inicial, intervalo ou número de doses
+    const houveMudancaAgenda = (
+      ho_administracao_medicamento !== medicamentoAtual.ho_administracao_medicamento ||
+      ds_intervalo_administracao !== medicamentoAtual.ds_intervalo_administracao ||
+      (nu_reagendamentos && nu_reagendamentos !== medicamentoAtual.nu_doses)
+    );
+    
+    // Se houve mudança que afeta as agendas, recriar todas as agendas
+    if (houveMudancaAgenda) {
+      console.log('🔄 Recriando agendas devido a mudanças no horário, intervalo ou número de doses');
+      
+      // 1. Buscar agendas existentes para verificar quais já foram concluídas
+      const agendasExistentes = await Mob_medicamentos_agenda.findAll({
+        where: { mob_medicamentos_id: id },
+        order: [['dt_administracao', 'ASC']]
+      });
+      
+      // 2. Deletar todas as agendas existentes (concluídas e pendentes)
+      await Mob_medicamentos_agenda.destroy({
+        where: { mob_medicamentos_id: id }
+      });
+      
+      // 3. Recriar as agendas com os novos parâmetros
+      const agendas = [];
+      const totalDoses = nu_reagendamentos || medicamentoAtual.nu_doses;
+      
+      // Criar string da data atual
+      const hoje = new Date();
+      const ano = hoje.getFullYear();
+      const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+      const dia = String(hoje.getDate()).padStart(2, '0');
+      
+      const primeiraAdministracaoString = `${ano}-${mes}-${dia} ${ho_administracao_medicamento}:00`;
+      
+      console.log('📅 Nova primeira administração:', primeiraAdministracaoString);
+      
+      // Verificar quantas doses já foram administradas na prática
+      const dosesJaConcluidas = agendasExistentes.filter(agenda => agenda.st_concluido === 1).length;
+      
+      // Criar as agendas
+      for (let i = 1; i <= totalDoses; i++) {
+        const dataAdministracao = moment(primeiraAdministracaoString)
+          .add(ds_intervalo_administracao * (i - 1), 'hours')
+          .format('YYYY-MM-DD HH:mm:ss');
+        
+        // Determinar se esta dose já foi concluída
+        // Marcar como concluída apenas as doses que realmente já foram dadas
+        const jaConcluida = i <= dosesJaConcluidas ? 1 : 0;
+        
+        agendas.push({
+          mob_medicamentos_id: id,
+          dt_administracao: dataAdministracao,
+          st_concluido: jaConcluida
+        });
+        
+        console.log(`📋 ${i}ª dose: ${dataAdministracao} - ${jaConcluida ? 'Concluída' : 'Pendente'}`);
+      }
+      
+      // Criar os novos registros
+      await Mob_medicamentos_agenda.bulkCreate(agendas);
+      
+      console.log('✅ Agendas recriadas com sucesso');
+    }
+    
+    res.status(200).json({ 
+      message: 'Medicamento atualizado com sucesso',
+      agendasRecriadas: houveMudancaAgenda 
+    });
+    
   } catch (error) {
     console.log('ERRO em /medicamentos/:id');
     console.log(error.message);
