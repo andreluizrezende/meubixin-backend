@@ -223,6 +223,7 @@ route.put('/medicamentos/:id', async (req, res) => {
       ho_administracao_medicamento,
       nu_reagendamentos // ← NOVO CAMPO
     } = req.body;
+    console.log('cheguei na edição')
     
     // Buscar o medicamento atual para obter dados anteriores
     const medicamentoAtual = await Mob_medicamentos.findOne({ where: { id } });
@@ -243,6 +244,7 @@ route.put('/medicamentos/:id', async (req, res) => {
     }, { where: { id } });
     
     if (!updatedRows) {
+      console.log('caiu aqui')
       return res.status(400).json({ message: 'Erro ao atualizar medicamento' });
     }
     
@@ -317,7 +319,7 @@ route.put('/medicamentos/:id', async (req, res) => {
     
   } catch (error) {
     console.log('ERRO em /medicamentos/:id');
-    console.log(error.message);
+    console.log(error);
     res.status(500).send({ error: "Erro ao atualizar medicamento" });
   }
 });
