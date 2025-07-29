@@ -262,6 +262,19 @@ route.post("/administradorLogin", async (req, res) => {
   }
 });
 
+route.get("/usuario/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const resposta = await usuarios.findOne({
+      where: { id},
+    });
+    resposta ? res.send(resposta) : res.send(false);
+  } catch (error) {
+    console.log("Erro em /usuario/:id");
+    console.log(error.message);
+  }
+});
+
 route.post("/recuperarSenha", async (req, res) => {
   console.log('aqui');
   try {

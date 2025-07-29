@@ -74,16 +74,18 @@ route.post('/web-veterinarios/validar-crmv', async (req, res) => {
   }
 });
 
-// Rota auxiliar para vincular conta Google (retorna apenas o google_id)
-route.post('/web-veterinarios/vincular-google', async (req, res) => {
+// ============= ROTAS ATUALIZADAS PARA WEB_VETERINARIOS =============
+
+// Rota de login com Google para web veterinários (MODIFICADA)
+route.post('/web-veterinarios/login/google', async (req, res) => {
   try {
-    const { id_token } = req.body;
-    console.log("Vinculando conta Google para cadastro");
+    const { token } = req.body; // Mudança: agora espera 'token' em vez de 'id_token'
+    console.log("Tentativa de login web veterinário com Google token");
 
     // Verifica e decodifica o token do Google
     const ticket = await client.verifyIdToken({
-      idToken: id_token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      idToken: token, // Usando o token recebido
+      audience: '867699850241-is78nhfgn1blt5ji6ag9tfpdcn0cuspb.apps.googleusercontent.com',
     });
 
     const payload = ticket.getPayload();
@@ -92,25 +94,41 @@ route.post('/web-veterinarios/vincular-google', async (req, res) => {
 
     console.log("Token Google válido. Google ID:", googleId, "Email:", email);
 
-    // Verifica se este Google ID já está sendo usado por outro veterinário
-    const googleIdExistente = await web_veterinarios.findOne({
-      where: { google_id: googleId }
+    // Busca o veterinário pelo Google ID
+    const veterinario = await web_veterinarios.findOne({ 
+      where: { google_id: googleId } 
     });
     
-    if (googleIdExistente) {
-      return res.status(409).json({
+    if (!veterinario) {
+      console.log("Veterinário não encontrado para o Google ID:", googleId);
+      
+      // NOVA LÓGICA: Retorna 200 com código específico
+      return res.status(200).json({
         success: false,
-        message: "Esta conta Google já está vinculada a outro veterinário."
+        code: 'USER_NOT_FOUND',
+        message: 'Nenhuma conta encontrada para este Google',
+        googleData: {
+          email: payload['email'],
+          name: payload['name'],
+          picture: payload['picture'],
+          googleId: payload['sub']
+        }
       });
     }
 
-    // Retorna os dados do Google para o frontend usar no cadastro
-    res.json({
+    console.log("Veterinário web autenticado com Google com sucesso!");
+    
+    // Retorna os dados do veterinário
+    const { ds_senha: _, ...veterinarioResponse } = veterinario.toJSON();
+    
+    res.status(200).json({
       success: true,
-      message: "Conta Google vinculada com sucesso!",
-      google_data: {
-        google_id: googleId,
-        email: email,
+      message: "Login com Google realizado com sucesso!",
+      token: `jwt_token_here_${veterinario.id}`, // Substitua por seu JWT real
+      veterinario: veterinarioResponse,
+      googleData: {
+        sub: payload['sub'],
+        email: payload['email'],
         name: payload['name'],
         picture: payload['picture'],
         email_verified: payload['email_verified']
@@ -118,105 +136,7 @@ route.post('/web-veterinarios/vincular-google', async (req, res) => {
     });
 
   } catch (error) {
-    console.log("Erro em /web-veterinarios/vincular-google!");
-    console.log(error.message);
-    res.status(500).json({
-      success: false,
-      message: "Erro ao vincular conta Google"
-    });
-  }
-});
-
-// Rota para cadastro de web veterinário (após validação do CRMV)
-route.post('/web-veterinarios/cadastro', async (req, res) => {
-  try {
-    const { 
-      mob_veterinarios_id,
-      mob_usuarios_id,
-      google_id, // Opcional - vem se o usuário vinculou o Google
-      nu_crmv,
-      ds_estado_crmv,
-      no_completo,
-      ds_email,
-      ds_senha, // Opcional - pode não ter se só usar Google
-      nu_cpf,
-      nu_telefone_completo,
-      ds_logo_s3_path
-    } = req.body;
-    
-    console.log("Iniciando cadastro de web veterinário");
-    
-    // Validações
-    if (!google_id && !ds_senha) {
-      return res.status(400).json({
-        success: false,
-        message: "É necessário definir uma senha ou vincular uma conta Google."
-      });
-    }
-    
-    // Verifica se já existe cadastro com este email
-    const emailExistente = await web_veterinarios.findOne({
-      where: { ds_email }
-    });
-    
-    if (emailExistente) {
-      return res.status(409).json({
-        success: false,
-        message: "Este email já está cadastrado na plataforma."
-      });
-    }
-    
-    // Se tem google_id, verifica se já está sendo usado
-    if (google_id) {
-      const googleIdExistente = await web_veterinarios.findOne({
-        where: { google_id }
-      });
-      
-      if (googleIdExistente) {
-        return res.status(409).json({
-          success: false,
-          message: "Esta conta Google já está vinculada a outro veterinário."
-        });
-      }
-    }
-    
-    // Hash da senha se foi fornecida
-    let hashedPassword = null;
-    if (ds_senha) {
-      hashedPassword = await bcrypt.hash(ds_senha, 10);
-    }
-    
-    // Cria o registro na web_veterinarios
-    const novoWebVeterinario = await web_veterinarios.create({
-      mob_veterinarios_id,
-      mob_usuarios_id,
-      google_id: google_id || null,
-      nu_crmv,
-      ds_estado_crmv,
-      no_completo,
-      ds_email,
-      ds_senha: hashedPassword,
-      nu_cpf,
-      nu_telefone_completo,
-      ds_logo_s3_path
-    });
-    
-    console.log("Web veterinário cadastrado com sucesso!");
-    
-    // Retorna os dados do veterinário criado (sem a senha)
-    const { ds_senha: _, ...veterinarioResponse } = novoWebVeterinario.toJSON();
-    
-    res.json({
-      success: true,
-      message: google_id 
-        ? "Cadastro realizado com sucesso! Conta Google vinculada." 
-        : "Cadastro realizado com sucesso!",
-      veterinario: veterinarioResponse,
-      tem_google: !!google_id
-    });
-    
-  } catch (error) {
-    console.log('ERRO em /web-veterinarios/cadastro');
+    console.log("Erro em /web-veterinarios/login/google!");
     console.log(error.message);
     res.status(500).json({
       success: false,
@@ -225,19 +145,84 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
   }
 });
 
-// Rota de login por email e senha para web veterinários
+// NOVA ROTA: Vincular conta Google a conta existente
+route.post('/web-veterinarios/link-google', async (req, res) => {
+  try {
+    const { userId, googleId, googleEmail } = req.body;
+    console.log(`Vinculando Google ID ${googleId} ao usuário ${userId}`);
+
+    // Verificar se usuário existe
+    const user = await web_veterinarios.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Usuário não encontrado' 
+      });
+    }
+
+    // Verificar se Google ID já está vinculado a outra conta
+    const existingGoogle = await web_veterinarios.findOne({
+      where: { google_id: googleId }
+    });
+    
+    if (existingGoogle && existingGoogle.id !== parseInt(userId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Esta conta Google já está vinculada a outro usuário' 
+      });
+    }
+
+    // Vincular conta Google
+    await web_veterinarios.update(
+      { 
+        google_id: googleId,
+        // Opcionalmente atualizar email se diferente
+        ...(user.ds_email !== googleEmail && { ds_email: googleEmail })
+      },
+      { where: { id: userId } }
+    );
+
+    console.log("Conta Google vinculada com sucesso!");
+    
+    res.json({ 
+      success: true, 
+      message: 'Conta Google vinculada com sucesso' 
+    });
+
+  } catch (error) {
+    console.error('Erro ao vincular Google:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro interno do servidor' 
+    });
+  }
+});
+
+// Rota de login por email e senha (ATUALIZADA para compatibilidade)
 route.post('/web-veterinarios/login', async (req, res) => {
   try {
-    const { ds_email, ds_senha } = req.body;
-    console.log("Tentativa de login web veterinário com email:", ds_email);
+    const { email, password, ds_email, ds_senha } = req.body;
+    
+    // Aceita tanto o formato novo quanto o antigo
+    const emailToUse = email || ds_email;
+    const passwordToUse = password || ds_senha;
+    
+    console.log("Tentativa de login web veterinário com email:", emailToUse);
+
+    if (!emailToUse || !passwordToUse) {
+      return res.status(400).json({
+        success: false,
+        message: "Email e senha são obrigatórios"
+      });
+    }
 
     // Busca o veterinário pelo email
     const veterinario = await web_veterinarios.findOne({ 
-      where: { ds_email } 
+      where: { ds_email: emailToUse } 
     });
     
     if (!veterinario) {
-      console.log("Veterinário não encontrado para o email:", ds_email);
+      console.log("Veterinário não encontrado para o email:", emailToUse);
       return res.status(401).json({
         success: false,
         message: "Email ou senha incorretos."
@@ -255,7 +240,7 @@ route.post('/web-veterinarios/login', async (req, res) => {
     }
 
     // Verifica a senha
-    const isMatch = await bcrypt.compare(ds_senha, veterinario.ds_senha);
+    const isMatch = await bcrypt.compare(passwordToUse, veterinario.ds_senha);
 
     if (!isMatch) {
       console.log("Senha incorreta para o veterinário:", veterinario.id);
@@ -273,6 +258,7 @@ route.post('/web-veterinarios/login', async (req, res) => {
     res.json({
       success: true,
       message: "Login realizado com sucesso!",
+      token: `jwt_token_here_${veterinario.id}`, // Substitua por seu JWT real
       veterinario: veterinarioResponse
     });
 
@@ -286,57 +272,286 @@ route.post('/web-veterinarios/login', async (req, res) => {
   }
 });
 
-// Rota de login com Google para web veterinários
-route.post('/web-veterinarios/login/google', async (req, res) => {
+// NOVA ROTA: Criar conta com dados do Google (para novos usuários)
+route.post('/web-veterinarios/cadastro', async (req, res) => {
   try {
-    const { id_token } = req.body;
-    console.log("Tentativa de login web veterinário com Google token");
-
-    // Verifica e decodifica o token do Google
-    const ticket = await client.verifyIdToken({
-      idToken: id_token,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-
-    const payload = ticket.getPayload();
-    const googleId = payload['sub'];
-    const email = payload['email'];
-
-    console.log("Token Google válido. Google ID:", googleId, "Email:", email);
-
-    // Busca o veterinário pelo Google ID
-    const veterinario = await web_veterinarios.findOne({ 
-      where: { google_id: googleId } 
-    });
+    const { 
+      // Dados obrigatórios do CRMV (já validados)
+      mob_veterinarios_id,
+      mob_usuarios_id,
+      nu_crmv,
+      ds_estado_crmv,
+      
+      // Dados pessoais
+      no_completo,
+      ds_email,
+      nu_cpf,
+      nu_telefone_completo,
+      ds_logo_s3_path,
+      
+      // Autenticação - pode ser senha OU Google
+      ds_senha,
+      
+      // Dados do Google (opcionais)
+      googleToken,
+      google_id
+    } = req.body;
     
-    if (!veterinario) {
-      console.log("Veterinário não encontrado para o Google ID:", googleId);
-      return res.status(401).json({
+    console.log("🚀 Iniciando cadastro web veterinário unificado");
+    console.log("📋 Dados recebidos:", {
+      hasGoogleToken: !!googleToken,
+      hasGoogleId: !!google_id,
+      hasPassword: !!ds_senha,
+      email: ds_email,
+      crmv: nu_crmv
+    });
+
+    // ========== VALIDAÇÕES BÁSICAS ==========
+    
+    // Verificar se tem CRMV validado
+    if (!mob_veterinarios_id || !nu_crmv || !ds_estado_crmv) {
+      return res.status(400).json({
         success: false,
-        message: "Conta Google não encontrada. Realize o cadastro primeiro."
+        message: "Dados do CRMV são obrigatórios. Valide o CRMV primeiro."
       });
     }
 
-    console.log("Veterinário web autenticado com Google com sucesso!");
+    // Verificar se tem nome e email
+    if (!no_completo || !ds_email) {
+      return res.status(400).json({
+        success: false,
+        message: "Nome completo e email são obrigatórios."
+      });
+    }
+
+    // Verificar se tem pelo menos uma forma de autenticação
+    if (!ds_senha && !googleToken && !google_id) {
+      return res.status(400).json({
+        success: false,
+        message: "É necessário definir uma senha ou usar autenticação Google."
+      });
+    }
+
+    // ========== PROCESSAMENTO DO GOOGLE (se fornecido) ==========
     
-    // Retorna os dados do veterinário e informações do Google
-    const { ds_senha: _, ...veterinarioResponse } = veterinario.toJSON();
+    let googleData = null;
+    let finalGoogleId = google_id; // Pode vir direto ou do token
     
+    if (googleToken) {
+      try {
+        console.log("🔍 Validando token Google...");
+        
+        const ticket = await client.verifyIdToken({
+          idToken: googleToken,
+          audience: '867699850241-is78nhfgn1blt5ji6ag9tfpdcn0cuspb.apps.googleusercontent.com',
+        });
+
+        const payload = ticket.getPayload();
+        googleData = {
+          google_id: payload['sub'],
+          email: payload['email'],
+          name: payload['name'],
+          picture: payload['picture']
+        };
+        
+        finalGoogleId = payload['sub']; // Usar Google ID do token
+        
+        console.log("✅ Token Google válido:", googleData.google_id);
+        
+        // Verificar se o email do Google confere com o fornecido
+        if (googleData.email !== ds_email) {
+          return res.status(400).json({
+            success: false,
+            message: "Email do Google não confere com o email fornecido."
+          });
+        }
+        
+      } catch (error) {
+        console.error("❌ Erro ao validar token Google:", error.message);
+        return res.status(400).json({
+          success: false,
+          message: "Token Google inválido."
+        });
+      }
+    }
+
+    // ========== VERIFICAÇÕES DE DUPLICAÇÃO ==========
+    
+    // Verificar se email já existe
+    const emailExistente = await web_veterinarios.findOne({
+      where: { ds_email }
+    });
+    
+    if (emailExistente) {
+      return res.status(409).json({
+        success: false,
+        message: "Este email já está cadastrado na plataforma."
+      });
+    }
+
+    // Verificar se Google ID já está sendo usado (se fornecido)
+    if (finalGoogleId) {
+      const googleIdExistente = await web_veterinarios.findOne({
+        where: { google_id: finalGoogleId }
+      });
+      
+      if (googleIdExistente) {
+        return res.status(409).json({
+          success: false,
+          message: "Esta conta Google já está vinculada a outro veterinário."
+        });
+      }
+    }
+
+    // Verificar se mob_veterinarios_id já tem cadastro web
+    const webVeterinarioExistente = await web_veterinarios.findOne({
+      where: { mob_veterinarios_id }
+    });
+    
+    if (webVeterinarioExistente) {
+      return res.status(409).json({
+        success: false,
+        message: "Este veterinário já possui cadastro na plataforma web."
+      });
+    }
+
+    // ========== PREPARAÇÃO DOS DADOS ==========
+    
+    // Hash da senha (se fornecida)
+    let senhaHash = null;
+    if (ds_senha) {
+      console.log("🔐 Gerando hash da senha...");
+      senhaHash = await bcrypt.hash(ds_senha, 10);
+    }
+
+    // Dados para criação
+    const dadosCriacao = {
+      mob_veterinarios_id,
+      mob_usuarios_id,
+      google_id: finalGoogleId || null,
+      nu_crmv,
+      ds_estado_crmv,
+      no_completo,
+      ds_email,
+      ds_senha: senhaHash,
+      nu_cpf: nu_cpf || null,
+      nu_telefone_completo: nu_telefone_completo || null,
+      ds_logo_s3_path: (googleData?.picture) || ds_logo_s3_path || null
+    };
+
+    console.log("💾 Criando veterinário com dados:", {
+      ...dadosCriacao,
+      ds_senha: dadosCriacao.ds_senha ? '[HASH]' : null
+    });
+
+    // ========== CRIAÇÃO DO REGISTRO ==========
+    
+    const novoWebVeterinario = await web_veterinarios.create(dadosCriacao);
+    
+    console.log("✅ Web veterinário criado com sucesso! ID:", novoWebVeterinario.id);
+    
+    // ========== RESPOSTA ==========
+    
+    // Retornar dados do usuário criado (sem a senha)
+    const { ds_senha: _, ...veterinarioResponse } = novoWebVeterinario.toJSON();
+    
+    const response = {
+      success: true,
+      message: googleData 
+        ? "Conta criada com sucesso usando Google!" 
+        : "Conta criada com sucesso!",
+      token: `jwt_token_here_${novoWebVeterinario.id}`, // Substitua por seu JWT real
+      veterinario: veterinarioResponse,
+      ...(googleData && {
+        googleData: {
+          sub: googleData.google_id,
+          email: googleData.email,
+          name: googleData.name,
+          picture: googleData.picture
+        }
+      })
+    };
+
+    console.log("🎉 Cadastro finalizado com sucesso!");
+    res.json(response);
+
+  } catch (error) {
+    console.error('❌ ERRO em /web-veterinarios/cadastro:', error.message);
+    console.error('Stack:', error.stack);
+    
+    res.status(500).json({
+      success: false,
+      message: "Erro interno do servidor"
+    });
+  }
+});
+
+// NOVA ROTA: Verificar disponibilidade de email
+route.post('/web-veterinarios/check-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email é obrigatório"
+      });
+    }
+
+    const veterinarioExistente = await web_veterinarios.findOne({
+      where: { ds_email: email }
+    });
+
     res.json({
       success: true,
-      message: "Login com Google realizado com sucesso!",
-      google_data: {
-        sub: payload['sub'],
-        email: payload['email'],
-        name: payload['name'],
-        picture: payload['picture'],
-        email_verified: payload['email_verified']
-      },
-      veterinario: veterinarioResponse
+      available: !veterinarioExistente,
+      message: veterinarioExistente 
+        ? "Email já está em uso" 
+        : "Email disponível"
     });
 
   } catch (error) {
-    console.log("Erro em /web-veterinarios/login/google!");
+    console.log('ERRO em /web-veterinarios/check-email');
+    console.log(error.message);
+    res.status(500).json({
+      success: false,
+      message: "Erro interno do servidor"
+    });
+  }
+});
+
+// NOVA ROTA: Buscar veterinário por email (para vincular conta)
+route.post('/web-veterinarios/find-by-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email é obrigatório"
+      });
+    }
+
+    const veterinario = await web_veterinarios.findOne({
+      where: { ds_email: email },
+      attributes: ['id', 'no_completo', 'ds_email', 'nu_crmv', 'ds_estado_crmv', 'google_id']
+    });
+
+    if (!veterinario) {
+      return res.status(404).json({
+        success: false,
+        message: "Nenhuma conta encontrada com este email"
+      });
+    }
+
+    res.json({
+      success: true,
+      veterinario: veterinario,
+      hasGoogle: !!veterinario.google_id
+    });
+
+  } catch (error) {
+    console.log('ERRO em /web-veterinarios/find-by-email');
     console.log(error.message);
     res.status(500).json({
       success: false,
