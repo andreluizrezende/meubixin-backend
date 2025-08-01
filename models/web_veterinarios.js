@@ -18,10 +18,6 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: true
     },
-    mob_usuarios_id: {
-      type: DataTypes.INTEGER,
-      allowNull: true
-    },
     google_id: {
       type: DataTypes.STRING(255),
       allowNull: true,
@@ -61,7 +57,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(255),
       allowNull: true
     },
-    ds_logo_s3_path: {
+    ds_logo_s3: {
+      type: DataTypes.STRING(500),
+      allowNull: true
+    },
+    ds_assinatura_s3: {
       type: DataTypes.STRING(500),
       allowNull: true
     }

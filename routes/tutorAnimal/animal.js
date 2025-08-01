@@ -4,7 +4,7 @@ const models = require('../../models');
 const { mob_animais, mob_tutores } = models;
 const Op = require('sequelize').Op;
 const { uploadProfilePetService } = require('../uploadImagens/service')
-const { uploadFile, deleteFile, getFileStream } = require("../../utils/s3_teste");
+const { uploadFile, deleteFile, getFileStream, fileExists } = require("../../utils/s3_teste");
 
 
 
@@ -273,6 +273,88 @@ route.delete('/animais/:id', async (req, res) => {
   } catch (error) {
     console.log('ERRO em /mob_animais');
     console.log(error.message);
+  }
+});
+
+// Adicionar esta rota no seu arquivo de rotas do backend
+
+// Rota para servir imagens dos animais do S3
+route.get('/animais/:id/imagem', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Buscar dados do animal para gerar a key correta
+    const animal = await mob_animais.findOne({ where: { id } });
+    
+    if (!animal) {
+      return res.status(404).json({ error: 'Animal não encontrado' });
+    }
+    
+    // Gerar a key da imagem
+    const key = `${id}_${animal.no_nome.replace(/\s+/g, '_')}`;
+    const filePath = `profilePet/${key}`;
+    
+    // Verificar se a imagem existe no S3
+    const imageExists = await fileExists(filePath);
+    
+    if (!imageExists) {
+      return res.status(404).json({ error: 'Imagem não encontrada' });
+    }
+    
+    // Buscar a imagem do S3
+    const fileStream = await getFileStream(filePath);
+    
+    if (!fileStream) {
+      return res.status(404).json({ error: 'Erro ao buscar imagem' });
+    }
+    
+    // Definir headers apropriados
+    res.set({
+      'Content-Type': 'image/jpeg', // ou image/png, dependendo do formato
+      'Cache-Control': 'public, max-age=3600' // Cache por 1 hora
+    });
+    
+    // Stream da imagem para o cliente
+    if (fileStream.pipe) {
+      fileStream.pipe(res);
+    } else {
+      // Para AWS SDK v3, o Body pode ser um ReadableStream
+      const chunks = [];
+      for await (const chunk of fileStream) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+      res.send(buffer);
+    }
+    
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Rota alternativa para verificar se animal tem imagem
+route.get('/animais/:id/has-image', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Buscar dados do animal
+    const animal = await mob_animais.findOne({ where: { id } });
+    
+    if (!animal) {
+      return res.status(404).json({ error: 'Animal não encontrado' });
+    }
+    
+    // Gerar a key da imagem
+    const key = `${id}_${animal.no_nome.replace(/\s+/g, '_')}`;
+    const filePath = `profilePet/${key}`;
+    
+    // Verificar se existe
+    const hasImage = await fileExists(filePath);
+    
+    res.json({ hasImage });
+    
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 

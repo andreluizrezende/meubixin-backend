@@ -59,8 +59,7 @@ route.post('/web-veterinarios/validar-crmv', async (req, res) => {
         no_completo: mobVeterinario.no_completo,
         ds_email: mobVeterinario.ds_email,
         nu_telefone_completo: mobVeterinario.nu_telefone_completo,
-        mob_veterinarios_id: mobVeterinario.id,
-        mob_usuarios_id: mobVeterinario.mob_usuarios_id
+        mob_veterinarios_id: mobVeterinario.id
       }
     });
     
@@ -278,7 +277,6 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
     const { 
       // Dados obrigatórios do CRMV (já validados)
       mob_veterinarios_id,
-      mob_usuarios_id,
       nu_crmv,
       ds_estado_crmv,
       
@@ -427,7 +425,6 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
     // Dados para criação
     const dadosCriacao = {
       mob_veterinarios_id,
-      mob_usuarios_id,
       google_id: finalGoogleId || null,
       nu_crmv,
       ds_estado_crmv,
@@ -436,7 +433,8 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
       ds_senha: senhaHash,
       nu_cpf: nu_cpf || null,
       nu_telefone_completo: nu_telefone_completo || null,
-      ds_logo_s3_path: (googleData?.picture) || ds_logo_s3_path || null
+      ds_logo_s3: (googleData?.picture) || ds_logo_s3_path || null,
+      ds_assinatura_s3: (googleData?.picture) || ds_logo_s3_path || null
     };
 
     console.log("💾 Criando veterinário com dados:", {
