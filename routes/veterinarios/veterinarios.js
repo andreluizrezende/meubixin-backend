@@ -433,8 +433,8 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
       ds_senha: senhaHash,
       nu_cpf: nu_cpf || null,
       nu_telefone_completo: nu_telefone_completo || null,
-      ds_logo_s3: (googleData?.picture) || ds_logo_s3_path || null,
-      ds_assinatura_s3: (googleData?.picture) || ds_logo_s3_path || null
+      ds_logo_s3: ds_logo_s3_path || null,
+      ds_assinatura_s3:  ds_logo_s3_path || null
     };
 
     console.log("💾 Criando veterinário com dados:", {
