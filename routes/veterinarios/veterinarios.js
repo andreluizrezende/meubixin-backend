@@ -2,6 +2,9 @@ const express = require('express');
 const route = express.Router();
 const models = require('../../models');
 const { mob_veterinarios, web_veterinarios, mob_usuarios, mob_administradores, mob_animais } = models;
+const { uploadFile, deleteFile, fileExists } = require('../../utils/s3_teste');
+const fs = require('fs');
+const path = require('path');
 
 const bcrypt = require('bcrypt');
 const { OAuth2Client } = require('google-auth-library');
@@ -601,33 +604,39 @@ route.get('/web-veterinarios/:id', async (req, res) => {
   }
 });
 
-// Rota para atualizar um web veterinário
 route.put('/web-veterinarios/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { ds_senha, ...dadosAtualizacao } = req.body;
+    const { ds_senha, google_id, created_at, updated_at, ...dadosAtualizacao } = req.body;
     
-    // Se foi enviada uma nova senha, faz o hash
-    if (ds_senha) {
-      dadosAtualizacao.ds_senha = await bcrypt.hash(ds_senha, 10);
-    }
-    
-    const [rowsAffected] = await web_veterinarios.update(
-      dadosAtualizacao,
-      { where: { id } }
-    );
-    
-    if (rowsAffected === 0) {
+    // Validar se veterinário existe
+    const veterinarioExistente = await web_veterinarios.findByPk(id);
+    if (!veterinarioExistente) {
       return res.status(404).json({
         success: false,
         message: "Veterinário não encontrado"
       });
     }
     
+    // Se foi enviada uma nova senha, faz o hash
+    if (ds_senha) {
+      dadosAtualizacao.ds_senha = await bcrypt.hash(ds_senha, 10);
+    }
+    
+    // Atualizar dados
+    await web_veterinarios.update(dadosAtualizacao, { where: { id } });
+    
+    // ✅ Buscar dados atualizados para retornar
+    const veterinarioAtualizado = await web_veterinarios.findByPk(id, {
+      attributes: { exclude: ['ds_senha'] }
+    });
+    
     res.json({
       success: true,
-      message: "Veterinário atualizado com sucesso!"
+      message: "Veterinário atualizado com sucesso!",
+      veterinario: veterinarioAtualizado // 🎯 Frontend precisa!
     });
+    
   } catch (error) {
     console.log('ERRO em /web-veterinarios/:id PUT');
     console.log(error.message);
@@ -636,6 +645,96 @@ route.put('/web-veterinarios/:id', async (req, res) => {
       message: "Erro interno do servidor"
     });
   }
+});
+
+
+// Rota para upload de imagens do veterinário (logo e assinatura)
+route.put('/web-veterinarios/:id/upload-image', async (req, res) => {
+ try {
+   const { id } = req.params;
+   const { tipo, imagem_base64 } = req.body;
+
+   // Validar parâmetros obrigatórios
+   if (!tipo || !['logo', 'assinatura'].includes(tipo)) {
+     return res.status(400).json({
+       success: false,
+       message: "Tipo deve ser 'logo' ou 'assinatura'"
+     });
+   }
+
+   if (!imagem_base64) {
+     return res.status(400).json({
+       success: false,
+       message: "Imagem é obrigatória"
+     });
+   }
+
+   // Buscar dados do veterinário para gerar key única
+   const veterinario = await web_veterinarios.findByPk(id);
+   if (!veterinario) {
+     return res.status(404).json({
+       success: false,
+       message: "Veterinário não encontrado"
+     });
+   }
+
+   // Gerar key única: veterinarios/12345_SP_logo ou veterinarios/12345_SP_assinatura
+   const key = `${veterinario.nu_crmv}_${veterinario.ds_estado_crmv}_${tipo}`;
+   const filePath = `veterinarios/${key}`;
+
+   // Verificar se já existe imagem no S3
+   const imageExists = await fileExists(filePath);
+
+   // Se existe, excluir primeiro
+   if (imageExists) {
+     console.log(`Imagem ${tipo} do veterinário ${veterinario.no_completo} encontrada. Excluindo...`);
+     await deleteFile(filePath);
+     console.log(`Imagem anterior excluída com sucesso!`);
+   }
+
+   // Upload da nova imagem
+   console.log(`Realizando upload da nova imagem ${tipo}...`);
+
+   // Criar arquivo temporário com a imagem base64
+   const tempFilePath = path.resolve(__dirname, `temp_${Date.now()}.png`);
+   
+   fs.writeFileSync(
+     tempFilePath,
+     imagem_base64.replace(/^data:image\/\w+;base64,/, ""), // Remove prefixo se existir
+     "base64"
+   );
+
+   // Criar stream de leitura do arquivo
+   const fileStream = fs.createReadStream(tempFilePath);
+
+   // Upload para S3
+   await uploadFile(fileStream, filePath);
+
+   // Remover arquivo temporário
+   fs.unlinkSync(tempFilePath);
+
+   // Atualizar campo correspondente no banco
+   const updateField = tipo === 'logo' ? 'ds_logo_s3' : 'ds_assinatura_s3';
+   await web_veterinarios.update(
+     { [updateField]: filePath },
+     { where: { id } }
+   );
+
+   console.log(`Upload de ${tipo} concluído com sucesso!`);
+
+   res.json({
+     success: true,
+     message: `${tipo === 'logo' ? 'Logo' : 'Assinatura'} atualizada com sucesso!`
+   });
+
+ } catch (error) {
+   console.log('ERRO em /web-veterinarios/:id/upload-image');
+   console.log(error.message);
+   res.status(500).json({
+     success: false,
+     message: "Erro interno do servidor"
+   });
+ }
 });
 
 // Rota para deletar um web veterinário
