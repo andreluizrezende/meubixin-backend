@@ -2,7 +2,7 @@ const express = require('express');
 const route = express.Router();
 const models = require('../../models');
 const { mob_veterinarios, web_veterinarios, mob_usuarios, mob_administradores, mob_animais } = models;
-const { uploadFile, deleteFile, fileExists } = require('../../utils/s3_teste');
+const { uploadFile, deleteFile, getFileStream } = require('../../utils/s3_teste');
 const fs = require('fs');
 const path = require('path');
 
@@ -682,8 +682,9 @@ route.put('/web-veterinarios/:id/upload-image', async (req, res) => {
    const key = `${veterinario.nu_crmv}_${veterinario.ds_estado_crmv}_${tipo}`;
    const filePath = `veterinarios/${key}`;
 
-   // Verificar se já existe imagem no S3
-   const imageExists = await fileExists(filePath);
+   // Verificar se já existe imagem no S3 usando getFileStream
+   const fileStream = await getFileStream(filePath);
+   const imageExists = fileStream !== undefined;
 
    // Se existe, excluir primeiro
    if (imageExists) {
@@ -705,10 +706,10 @@ route.put('/web-veterinarios/:id/upload-image', async (req, res) => {
    );
 
    // Criar stream de leitura do arquivo
-   const fileStream = fs.createReadStream(tempFilePath);
+   const fileStreamUpload = fs.createReadStream(tempFilePath);
 
    // Upload para S3
-   await uploadFile(fileStream, filePath);
+   await uploadFile(fileStreamUpload, filePath);
 
    // Remover arquivo temporário
    fs.unlinkSync(tempFilePath);
@@ -735,6 +736,62 @@ route.put('/web-veterinarios/:id/upload-image', async (req, res) => {
      message: "Erro interno do servidor"
    });
  }
+});
+
+route.get('/web-veterinarios/:id/imagem/:tipo', async (req, res) => {
+  try {
+    const { id, tipo } = req.params;
+    
+    // Validar tipo
+    if (!tipo || !['logo', 'assinatura'].includes(tipo)) {
+      return res.status(400).json({
+        error: "Tipo deve ser 'logo' ou 'assinatura'"
+      });
+    }
+    
+    // Buscar dados do veterinário para gerar a key correta
+    const veterinario = await web_veterinarios.findByPk(id);
+    
+    if (!veterinario) {
+      return res.status(404).json({ error: 'Veterinário não encontrado' });
+    }
+    
+    // Gerar a key da imagem
+    const key = `${veterinario.nu_crmv}_${veterinario.ds_estado_crmv}_${tipo}`;
+    const filePath = `veterinarios/${key}`;
+    
+    // Verificar se a imagem existe no S3 usando getFileStream
+    const fileStream = await getFileStream(filePath);
+    const imageExists = fileStream !== undefined;
+    
+    if (!imageExists) {
+      return res.status(404).json({ error: `${tipo === 'logo' ? 'Logo' : 'Assinatura'} não encontrada` });
+    }
+    
+    // Definir headers apropriados
+    res.set({
+      'Content-Type': 'image/png', // ou image/jpeg, dependendo do formato
+      'Cache-Control': 'no-store, max-age=0' // Cache por 1 hora
+    });
+    
+    // Stream da imagem para o cliente
+    if (fileStream.pipe) {
+      fileStream.pipe(res);
+    } else {
+      // Para AWS SDK v3, o Body pode ser um ReadableStream
+      const chunks = [];
+      for await (const chunk of fileStream) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+      res.send(buffer);
+    }
+    
+  } catch (error) {
+    console.log('ERRO em /web-veterinarios/:id/imagem/:tipo');
+    console.log(error.message);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 });
 
 // Rota para deletar um web veterinário
