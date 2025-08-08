@@ -639,7 +639,7 @@ route.put('/web-veterinarios/:id', async (req, res) => {
     
   } catch (error) {
     console.log('ERRO em /web-veterinarios/:id PUT');
-    console.log(error.message);
+    console.log(error);
     res.status(500).json({
       success: false,
       message: "Erro interno do servidor"
@@ -652,7 +652,15 @@ route.put('/web-veterinarios/:id', async (req, res) => {
 route.put('/web-veterinarios/:id/upload-image', async (req, res) => {
  try {
    const { id } = req.params;
-   const { tipo, imagem_base64 } = req.body;
+   const { tipo, imagem_base64, remover = false } = req.body;
+
+   // ✅ ADICIONAR LOG PARA DEBUG
+   console.log('📥 Parâmetros recebidos:', { 
+     tipo, 
+     remover, 
+     tem_imagem: !!imagem_base64,
+     tamanho_imagem: imagem_base64?.length || 0 
+   });
 
    // Validar parâmetros obrigatórios
    if (!tipo || !['logo', 'assinatura'].includes(tipo)) {
@@ -662,10 +670,12 @@ route.put('/web-veterinarios/:id/upload-image', async (req, res) => {
      });
    }
 
-   if (!imagem_base64) {
+   // ✅ CORRIGIR VALIDAÇÃO: Se não é remoção, validar se tem imagem
+   if (remover !== true && !imagem_base64) {
+     console.log('❌ Falha na validação - remover:', remover, 'tem_imagem:', !!imagem_base64);
      return res.status(400).json({
        success: false,
-       message: "Imagem é obrigatória"
+       message: "Imagem é obrigatória ou use 'remover: true'"
      });
    }
 
@@ -682,19 +692,48 @@ route.put('/web-veterinarios/:id/upload-image', async (req, res) => {
    const key = `${veterinario.nu_crmv}_${veterinario.ds_estado_crmv}_${tipo}`;
    const filePath = `veterinarios/${key}`;
 
-   // Verificar se já existe imagem no S3 usando getFileStream
+   // Verificar se já existe imagem no S3
    const fileStream = await getFileStream(filePath);
    const imageExists = fileStream !== undefined;
 
-   // Se existe, excluir primeiro
-   if (imageExists) {
-     console.log(`Imagem ${tipo} do veterinário ${veterinario.no_completo} encontrada. Excluindo...`);
-     await deleteFile(filePath);
-     console.log(`Imagem anterior excluída com sucesso!`);
+   // Campo do banco correspondente
+   const updateField = tipo === 'logo' ? 'ds_logo_s3' : 'ds_assinatura_s3';
+
+   // ✅ CASO 1: REMOÇÃO DA IMAGEM
+   if (remover === true) {
+     console.log(`🗑️ Removendo ${tipo} do veterinário ${veterinario.no_completo}...`);
+     
+     // Se existe no S3, excluir
+     if (imageExists) {
+       await deleteFile(filePath);
+       console.log(`✅ Imagem ${tipo} excluída do S3 com sucesso!`);
+     } else {
+       console.log(`ℹ️ Imagem ${tipo} não existe no S3, apenas limpando banco...`);
+     }
+
+     // Limpar campo no banco (definir como null)
+     await web_veterinarios.update(
+       { [updateField]: null },
+       { where: { id } }
+     );
+
+     console.log(`✅ Campo ${updateField} limpo no banco com sucesso!`);
+
+     return res.json({
+       success: true,
+       message: `${tipo === 'logo' ? 'Logo' : 'Assinatura'} removida com sucesso!`
+     });
    }
 
-   // Upload da nova imagem
-   console.log(`Realizando upload da nova imagem ${tipo}...`);
+   // ✅ CASO 2: UPLOAD DE NOVA IMAGEM
+   console.log(`📤 Realizando upload da nova imagem ${tipo}...`);
+
+   // Se existe imagem antiga, excluir primeiro
+   if (imageExists) {
+     console.log(`🔄 Imagem ${tipo} existente encontrada. Excluindo...`);
+     await deleteFile(filePath);
+     console.log(`✅ Imagem anterior excluída com sucesso!`);
+   }
 
    // Criar arquivo temporário com a imagem base64
    const tempFilePath = path.resolve(__dirname, `temp_${Date.now()}.png`);
@@ -715,13 +754,12 @@ route.put('/web-veterinarios/:id/upload-image', async (req, res) => {
    fs.unlinkSync(tempFilePath);
 
    // Atualizar campo correspondente no banco
-   const updateField = tipo === 'logo' ? 'ds_logo_s3' : 'ds_assinatura_s3';
    await web_veterinarios.update(
      { [updateField]: filePath },
      { where: { id } }
    );
 
-   console.log(`Upload de ${tipo} concluído com sucesso!`);
+   console.log(`✅ Upload de ${tipo} concluído com sucesso!`);
 
    res.json({
      success: true,
@@ -729,7 +767,7 @@ route.put('/web-veterinarios/:id/upload-image', async (req, res) => {
    });
 
  } catch (error) {
-   console.log('ERRO em /web-veterinarios/:id/upload-image');
+   console.log('❌ ERRO em /web-veterinarios/:id/upload-image');
    console.log(error.message);
    res.status(500).json({
      success: false,
