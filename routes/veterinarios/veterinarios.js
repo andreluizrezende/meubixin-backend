@@ -952,4 +952,242 @@ route.delete('/veterinarios/:id', async (req, res) => {
   }
 });
 
+// Rota para alterar senha do web veterinário
+route.post('/web-veterinarios/:id/change-password', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { senha_atual, nova_senha, confirmar_senha } = req.body
+
+    console.log(`🔐 Tentativa de alteração de senha para veterinário ${id}`)
+
+    // ========== VALIDAÇÕES BÁSICAS ==========
+    
+    if (!nova_senha || !confirmar_senha) {
+      return res.status(400).json({
+        success: false,
+        message: "Nova senha e confirmação são obrigatórias",
+        code: "MISSING_REQUIRED_FIELDS"
+      })
+    }
+
+    if (nova_senha !== confirmar_senha) {
+      return res.status(400).json({
+        success: false,
+        message: "Nova senha e confirmação não coincidem",
+        code: "PASSWORD_MISMATCH"
+      })
+    }
+
+    if (nova_senha.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Nova senha deve ter pelo menos 6 caracteres",
+        code: "PASSWORD_TOO_SHORT"
+      })
+    }
+
+    // ========== BUSCAR VETERINÁRIO ==========
+    
+    const veterinario = await web_veterinarios.findByPk(id)
+    
+    if (!veterinario) {
+      return res.status(404).json({
+        success: false,
+        message: "Veterinário não encontrado",
+        code: "USER_NOT_FOUND"
+      })
+    }
+
+    // ========== VALIDAR SENHA ATUAL (se já tiver senha definida) ==========
+    
+    const jaTemSenha = veterinario.ds_senha && veterinario.ds_senha.trim() !== ''
+    
+    if (jaTemSenha) {
+      // Se já tem senha, deve informar a senha atual
+      if (!senha_atual) {
+        return res.status(400).json({
+          success: false,
+          message: "Senha atual é obrigatória para alterar a senha",
+          code: "CURRENT_PASSWORD_REQUIRED"
+        })
+      }
+
+      // Verificar se a senha atual está correta
+      const senhaAtualCorreta = await bcrypt.compare(senha_atual, veterinario.ds_senha)
+      
+      if (!senhaAtualCorreta) {
+        console.log(`❌ Senha atual incorreta para veterinário ${id}`)
+        return res.status(401).json({
+          success: false,
+          message: "Senha atual incorreta",
+          code: "INVALID_CURRENT_PASSWORD"
+        })
+      }
+    } else {
+      // Se não tem senha (só login com Google), pode definir senha sem validar atual
+      console.log(`ℹ️ Definindo primeira senha para veterinário ${id} (conta Google)`)
+    }
+
+    // ========== VERIFICAR SE NOVA SENHA É DIFERENTE DA ATUAL ==========
+    
+    if (jaTemSenha) {
+      const novaSenhaIgualAtual = await bcrypt.compare(nova_senha, veterinario.ds_senha)
+      
+      if (novaSenhaIgualAtual) {
+        return res.status(400).json({
+          success: false,
+          message: "A nova senha deve ser diferente da senha atual",
+          code: "SAME_PASSWORD"
+        })
+      }
+    }
+
+    // ========== GERAR HASH DA NOVA SENHA ==========
+    
+    console.log(`🔐 Gerando hash da nova senha para veterinário ${id}`)
+    const novaSenhaHash = await bcrypt.hash(nova_senha, 10)
+
+    // ========== ATUALIZAR SENHA NO BANCO ==========
+    
+    await web_veterinarios.update(
+      { ds_senha: novaSenhaHash },
+      { where: { id } }
+    )
+
+    console.log(`✅ Senha alterada com sucesso para veterinário ${id}`)
+
+    // ========== RESPOSTA DE SUCESSO ==========
+    
+    res.json({
+      success: true,
+      message: jaTemSenha ? "Senha alterada com sucesso!" : "Senha definida com sucesso!",
+      code: "PASSWORD_CHANGED"
+    })
+
+  } catch (error) {
+    console.error('❌ ERRO em /web-veterinarios/:id/change-password:', error.message)
+    console.error('Stack:', error.stack)
+    
+    res.status(500).json({
+      success: false,
+      message: "Erro interno do servidor",
+      code: "INTERNAL_ERROR"
+    })
+  }
+})
+
+// Adicionar no arquivo de rotas dos web_veterinarios (paste.txt)
+
+// ============= ROTA PARA STATUS DE SEGURANÇA =============
+
+// Rota para obter status de segurança do veterinário
+route.get('/web-veterinarios/:id/security-status', async (req, res) => {
+  try {
+    const { id } = req.params
+
+    console.log(`🔍 Buscando status de segurança para veterinário ${id}`)
+
+    // ========== BUSCAR VETERINÁRIO ==========
+    
+    const veterinario = await web_veterinarios.findByPk(id, {
+      attributes: ['id', 'google_id', 'ds_senha', 'updatedAt', 'createdAt']
+    })
+    
+    if (!veterinario) {
+      return res.status(404).json({
+        success: false,
+        message: "Veterinário não encontrado",
+        code: "USER_NOT_FOUND"
+      })
+    }
+
+    // ========== CALCULAR STATUS DE SEGURANÇA ==========
+    
+    const hasPassword = !!(veterinario.ds_senha && veterinario.ds_senha.trim() !== '')
+    const hasGoogle = !!(veterinario.google_id && veterinario.google_id.trim() !== '')
+    
+    // Calcular data da última atualização da senha (aproximada)
+    let passwordSetDate = null
+    if (hasPassword) {
+      // Se tem senha, usar a data de atualização do registro
+      passwordSetDate = veterinario.updatedAt
+    }
+
+    // Determinar nível de segurança
+    let securityLevel = 'low'
+    let securityScore = 0
+    
+    if (hasPassword) securityScore += 50
+    if (hasGoogle) securityScore += 50
+    
+    if (securityScore >= 100) {
+      securityLevel = 'high' // Tem senha E Google
+    } else if (securityScore >= 50) {
+      securityLevel = 'medium' // Tem apenas um método
+    } else {
+      securityLevel = 'low' // Não deveria acontecer, mas...
+    }
+
+    // ========== MONTAR RESPOSTA ==========
+    
+    const securityStatus = {
+      has_password: hasPassword,
+      has_google: hasGoogle,
+      password_set_date: passwordSetDate,
+      security_level: securityLevel,
+      security_score: securityScore,
+      login_methods: [],
+      recommendations: []
+    }
+
+    // Métodos de login disponíveis
+    if (hasGoogle) {
+      securityStatus.login_methods.push('google')
+    }
+    if (hasPassword) {
+      securityStatus.login_methods.push('email_password')
+    }
+
+    // Recomendações de segurança
+    if (!hasPassword && hasGoogle) {
+      securityStatus.recommendations.push('consider_setting_backup_password')
+    }
+    if (!hasGoogle && hasPassword) {
+      securityStatus.recommendations.push('consider_linking_google_account')
+    }
+    if (hasPassword) {
+      // Verificar se senha é antiga (mais de 90 dias)
+      const passwordAge = passwordSetDate ? (Date.now() - new Date(passwordSetDate).getTime()) / (1000 * 60 * 60 * 24) : 0
+      if (passwordAge > 90) {
+        securityStatus.recommendations.push('password_update_recommended')
+      }
+    }
+
+    console.log(`✅ Status de segurança calculado para veterinário ${id}:`, {
+      hasPassword,
+      hasGoogle,
+      securityLevel,
+      loginMethods: securityStatus.login_methods.length
+    })
+
+    // ========== RESPOSTA DE SUCESSO ==========
+    
+    res.json({
+      success: true,
+      message: "Status de segurança obtido com sucesso",
+      data: securityStatus
+    })
+
+  } catch (error) {
+    console.error('❌ ERRO em /web-veterinarios/:id/security-status:', error.message)
+    console.error('Stack:', error.stack)
+    
+    res.status(500).json({
+      success: false,
+      message: "Erro interno do servidor",
+      code: "INTERNAL_ERROR"
+    })
+  }
+})
+
 module.exports = route;
