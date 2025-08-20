@@ -12,6 +12,20 @@ const { OAuth2Client } = require('google-auth-library');
 // Configurar o Google OAuth client
 const client = new OAuth2Client('867699850241-is78nhfgn1blt5ji6ag9tfpdcn0cuspb.apps.googleusercontent.com');
 
+const { 
+  generateSecureToken, 
+  hashToken, 
+  verifyToken, 
+  getExpirationDate, 
+  validateTokenRecord,
+  parseUserAgent,
+  checkRateLimit,
+  validateResetRequest,
+  sanitizeForLog
+} = require('../../utils/token');
+
+const { Op } = require('sequelize');
+const axios = require('axios');
 // ============= ROTAS PARA WEB_VETERINARIOS =============
 
 // Rota para validar CRMV + Estado e buscar dados pré-existentes
@@ -1189,5 +1203,8 @@ route.get('/web-veterinarios/:id/security-status', async (req, res) => {
     })
   }
 })
+
+
+
 
 module.exports = route;
