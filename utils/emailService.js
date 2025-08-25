@@ -166,7 +166,7 @@ const createResetEmailTemplate = ({ name, resetUrl, expiresAt }) => {
         <!-- Header -->
         <div class="header">
             <h1>🔐 Redefinição de Senha</h1>
-            <p>CicaTriBio Vet - Sistema Veterinário</p>
+            <p>Meu Bixin</p>
         </div>
 
         <!-- Content -->
@@ -176,7 +176,7 @@ const createResetEmailTemplate = ({ name, resetUrl, expiresAt }) => {
             </div>
 
             <div class="message">
-                Recebemos uma solicitação para redefinir a senha da sua conta no sistema CicaTriBio Vet.
+                Recebemos uma solicitação para redefinir a senha da sua conta no sistema Meu Bixin.
                 Se você fez esta solicitação, clique no botão abaixo para criar uma nova senha:
             </div>
 
@@ -217,7 +217,7 @@ const createResetEmailTemplate = ({ name, resetUrl, expiresAt }) => {
         <!-- Footer -->
         <div class="footer">
             <p>
-                <strong>CicaTriBio Vet</strong><br>
+                <strong>Meu Bixin</strong><br>
                 Sistema de Gestão Veterinária com Análise de Feridas<br>
                 <a href="mailto:suporte@cicatribio.com.br">suporte@cicatribio.com.br</a>
             </p>

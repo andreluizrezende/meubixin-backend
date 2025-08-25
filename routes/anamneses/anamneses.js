@@ -225,10 +225,12 @@ route.get("/anamneses/:id/completa-optimized", async (req, res) => {
         f.vl_largura,
         f.createdAt as ferida_data_envio,
         lf.ds_local_feridas as local,
+        lf.id as mob_local_feridas_id,
         tt.ds_tipo_tecidos as tipo_tecido,
         imf.id as imagem_id,
         imf.ds_caminho_server,
-        sif.vl_dimensao_ia
+        sif.vl_dimensao_ia,
+        a.mob_animais_id
       FROM mob_anamneses a
       LEFT JOIN mob_sistema_oto_tegumentar sot ON a.id = sot.mob_anamneses_id
       LEFT JOIN mob_feridas f ON a.id = f.mob_anamneses_id
