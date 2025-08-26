@@ -33,7 +33,7 @@ const createResetEmailTemplate = ({ name, resetUrl, expiresAt }) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redefinição de Senha - CicaTriBio Vet</title>
+    <title>Redefinição de Senha - Meu Bixin</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -240,14 +240,14 @@ async function sendResetPasswordEmail({ email, name, resetUrl, expiresAt }) {
         console.log('✅ Servidor de email pronto');
 
         const mailOptions = {
-            from: '"CicaTriBio Vet" <suporte@cicatribio.com.br>',
+            from: '"Meu Bixin" <suporte@cicatribio.com.br>',
             to: email,
-            subject: '🔐 Redefinição de Senha - CicaTriBio Vet',
+            subject: '🔐 Redefinição de Senha - Meu Bixin',
             html: createResetEmailTemplate({ name, resetUrl, expiresAt }),
             text: `
 Olá, ${name}!
 
-Recebemos uma solicitação para redefinir a senha da sua conta no CicaTriBio Vet.
+Recebemos uma solicitação para redefinir a senha da sua conta no Meu Bixin.
 
 Clique no link abaixo para redefinir sua senha:
 ${resetUrl}
@@ -257,7 +257,7 @@ Este link expira em 15 minutos por segurança.
 Se você não solicitou esta redefinição, ignore este email.
 
 ---
-CicaTriBio Vet - Sistema Veterinário
+Meu Bixin
 suporte@cicatribio.com.br
       `.trim()
         };
