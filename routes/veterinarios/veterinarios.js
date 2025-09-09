@@ -1,7 +1,7 @@
 const express = require('express');
 const route = express.Router();
 const models = require('../../models');
-const { mob_veterinarios, web_veterinarios, mob_usuarios, mob_administradores, mob_animais } = models;
+const { mob_veterinarios, web_veterinarios, mob_protocolos_saude, mob_animais } = models;
 const { uploadFile, deleteFile, getFileStream } = require('../../utils/s3_teste');
 const fs = require('fs');
 const path = require('path');

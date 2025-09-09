@@ -42,6 +42,7 @@ const rotaProtocolosSaude = require('./routes/tabelasControle/mob_protocolos_sau
 const rotaVeterinario = require('./routes/veterinarios/veterinarios')
 const rotaMedicamento = require('./routes/medicamentos/medicamentos')
 const rotaResetPass = require('./routes/resetPassword/resetPassword')
+const rotaPrescricoes = require('./routes/prescricoes/prescricoes')
 
 app.use('/admin', adminRoutes);
 app.use(rotaInicial);
@@ -74,5 +75,6 @@ app.use(rotaProtocolosSaude);
 app.use(rotaVeterinario);
 app.use(rotaMedicamento);
 app.use(rotaResetPass);
+app.use(rotaPrescricoes);
 
 app.listen(PORT, () => console.log(`running on port: ${PORT}`));
