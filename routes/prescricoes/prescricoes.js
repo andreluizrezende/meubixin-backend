@@ -268,12 +268,28 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
     console.log(`Anamnese ${anamneseId} atualizada`);
 
     // 2. Deletar protocolos e agendas antigos
-    await WebProtocolosAgendas.destroy({
-      where: {
-        web_protocolos_id: sequelize.literal(`IN (SELECT id FROM web_protocolos WHERE web_anamneses_id = ${anamneseId})`)
-      },
+    // Primeiro buscar os IDs dos protocolos
+    const protocolosAntigos = await WebProtocolos.findAll({
+      where: { web_anamneses_id: anamneseId },
+      attributes: ['id'],
       transaction
     });
+
+    const protocolosIds = protocolosAntigos.map(p => p.id);
+
+    // Deletar agendas dos protocolos
+    if (protocolosIds.length > 0) {
+      await WebProtocolosAgendas.destroy({
+        where: {
+          web_protocolos_id: {
+            [Op.in]: protocolosIds
+          }
+        },
+        transaction
+      });
+    }
+
+    // Deletar protocolos
     await WebProtocolos.destroy({
       where: { web_anamneses_id: anamneseId },
       transaction
@@ -327,12 +343,16 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
         anamneseId,
         totais: {
           protocolos: protocolosCriados.length,
-          agendas: agendasCriadas.length
+          agendas: agendasCriadas.length,
+          vacinas: protocolosCriados.filter(p => p.st_tipo_protocolo === 0).length,
+          medicamentos: protocolosCriados.filter(p => p.st_tipo_protocolo === 1).length,
+          vermifugos: protocolosCriados.filter(p => p.st_tipo_protocolo === 2).length
         }
       }
     });
 
   } catch (error) {
+    console.log(error)
     await transaction.rollback();
     console.error('ERRO em PUT /prescricoes/:anamneseId', error);
     res.status(500).json({
@@ -401,90 +421,112 @@ route.get('/prescricoes/veterinario/:veterinarioId', async (req, res) => {
   }
 });
 
-// Buscar detalhes de uma prescrição específica
-// Buscar detalhes de uma prescrição específica
 route.get('/prescricoes/:anamneseId', async (req, res) => {
   try {
     const { anamneseId } = req.params;
     console.log("Buscando prescrição (SQL) anamneseId:", anamneseId);
 
-const prescricaoSQL = `
-  SELECT 
-    a.id AS anamnese_id,
-    a.dt_data_anamnese,
-    a.ds_orientacoes,
-    a.ds_quadro_clinico,
-    a.ds_diagnostico,
-    a.ds_tratamento,
-    a.vl_peso,
-    a.ds_temperatura,
-    a.ds_resultados_exames_anteriores,
-    p.id AS protocolo_id,
-    ps.ds_protocolos_saude AS nome_protocolo,
-    pa.id AS agenda_id,
-    pa.dt_data_aplicacao,
-    pa.st_concluido
-  FROM web_anamneses a
-  LEFT JOIN web_protocolos p ON p.web_anamneses_id = a.id
-  LEFT JOIN mob_protocolos_saude ps ON ps.id = p.mob_protocolos_saude_id
-  LEFT JOIN web_protocolos_agendas pa ON pa.web_protocolos_id = p.id
-  WHERE a.id = :anamneseId
-  ORDER BY p.id, pa.dt_data_aplicacao ASC
-`;
+    const prescricaoSQL = `
+      SELECT 
+        a.id AS anamnese_id,
+        a.web_veterinarios_id,
+        a.mob_animais_id,
+        a.dt_data_anamnese,
+        a.ds_orientacoes,
+        a.ds_quadro_clinico,
+        a.ds_diagnostico,
+        a.ds_tratamento,
+        a.vl_peso,
+        a.ds_temperatura,
+        a.ds_resultados_exames_anteriores,
+        p.id AS protocolo_id,
+        p.mob_protocolos_saude_id,
+        p.nu_doses,
+        p.nu_intervalo_uso,
+        p.tipo_intervalo_uso,
+        p.ds_dosagem,
+        p.st_tipo_protocolo,
+        ps.ds_protocolos_saude AS nome_protocolo,
+        pa.id AS agenda_id,
+        pa.dt_data_aplicacao,
+        pa.st_concluido
+      FROM web_anamneses a
+      LEFT JOIN web_protocolos p ON p.web_anamneses_id = a.id
+      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.mob_protocolos_saude_id
+      LEFT JOIN web_protocolos_agendas pa ON pa.web_protocolos_id = p.id
+      WHERE a.id = :anamneseId
+      ORDER BY p.id, pa.dt_data_aplicacao ASC
+    `;
 
-const results = await sequelize.query(prescricaoSQL, {
-  replacements: { anamneseId },
-  type: sequelize.QueryTypes.SELECT
-});
+    const results = await sequelize.query(prescricaoSQL, {
+      replacements: { anamneseId },
+      type: sequelize.QueryTypes.SELECT
+    });
 
-if (results.length === 0) {
-  return res.send(false);
-}
+    if (results.length === 0) {
+      return res.send(false);
+    }
 
-const prescricao = {
-  id: results[0].anamnese_id,
-  dt_data: results[0].dt_data_anamnese,
-  observacoes: results[0].ds_orientacoes || null,
-  dados_anamnese: {
-    quadro_clinico: results[0].ds_quadro_clinico || null,
-    diagnostico: results[0].ds_diagnostico || null,
-    tratamento: results[0].ds_tratamento || null,
-    peso: results[0].vl_peso || null,
-    temperatura: results[0].ds_temperatura || null,
-    exames_anteriores: results[0].ds_resultados_exames_anteriores || null
-  },
-  protocolos: {}
-};
+    // Pegar dados da primeira linha (dados da anamnese)
+    const firstRow = results[0];
 
+    const prescricao = {
+      id: firstRow.anamnese_id,
+      anamnese_id: firstRow.anamnese_id,
+      web_veterinarios_id: firstRow.web_veterinarios_id,
+      mob_animais_id: firstRow.mob_animais_id,
+      dt_data: firstRow.dt_data_anamnese,
+      observacoes: firstRow.ds_orientacoes || null,
+      dados_anamnese: {
+        quadro_clinico: firstRow.ds_quadro_clinico || '',
+        diagnostico: firstRow.ds_diagnostico || '',
+        tratamento: firstRow.ds_tratamento || '',
+        peso: firstRow.vl_peso || 0,
+        temperatura: firstRow.ds_temperatura || '',
+        exames_anteriores: firstRow.ds_resultados_exames_anteriores || '',
+        orientacoes: firstRow.ds_orientacoes || ''
+      },
+      protocolos: [],
+      agendas: {}
+    };
 
-    // Tirar duplicados que vêm dos JOINs
-    delete prescricao.protocolo_id;
-    delete prescricao.nome_protocolo;
-    delete prescricao.agenda_id;
-    delete prescricao.dt_data_aplicacao;
-    delete prescricao.st_concluido;
+    // Agrupar protocolos e agendas
+    const protocolosMap = {};
 
     results.forEach((row) => {
-      if (row.protocolo_id && !prescricao.protocolos[row.protocolo_id]) {
-        prescricao.protocolos[row.protocolo_id] = {
+      if (row.protocolo_id && !protocolosMap[row.protocolo_id]) {
+        protocolosMap[row.protocolo_id] = {
           id: row.protocolo_id,
+          web_anamneses_id: row.anamnese_id,
+          mob_protocolos_saude_id: row.mob_protocolos_saude_id,
+          nu_doses: row.nu_doses || 1,
+          nu_intervalo_uso: row.nu_intervalo_uso || 1,
+          tipo_intervalo_uso: row.tipo_intervalo_uso || 'D',
+          ds_dosagem: row.ds_dosagem || '',
+          st_tipo_protocolo: row.st_tipo_protocolo || 0,
           nome_protocolo: row.nome_protocolo || 'Protocolo não identificado',
           agendas: []
         };
+        prescricao.agendas[row.protocolo_id] = [];
       }
 
-      if (row.agenda_id && prescricao.protocolos[row.protocolo_id]) {
-        prescricao.protocolos[row.protocolo_id].agendas.push({
+      if (row.agenda_id && protocolosMap[row.protocolo_id]) {
+        const agenda = {
           id: row.agenda_id,
+          web_protocolos_id: row.protocolo_id,
           dt_data_aplicacao: row.dt_data_aplicacao,
           st_concluido: row.st_concluido
-        });
+        };
+        
+        protocolosMap[row.protocolo_id].agendas.push(agenda);
+        prescricao.agendas[row.protocolo_id].push(agenda);
       }
     });
 
-    // Transformar protocolos em array
-    prescricao.protocolos = Object.values(prescricao.protocolos);
+    // Converter protocolos em array
+    prescricao.protocolos = Object.values(protocolosMap);
 
+    console.log('Prescrição retornada:', JSON.stringify(prescricao, null, 2));
     res.send(prescricao);
 
   } catch (error) {
