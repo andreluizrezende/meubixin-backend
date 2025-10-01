@@ -1,5 +1,14 @@
 require('dotenv').config();
-const { S3Client, PutObjectCommand, ListBucketsCommand, CreateBucketCommand, GetObjectCommand, ListObjectsCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { 
+  S3Client, 
+  PutObjectCommand, 
+  ListBucketsCommand, 
+  CreateBucketCommand, 
+  GetObjectCommand, 
+  ListObjectsCommand, 
+  DeleteObjectCommand
+} = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const Bucket = AWS_BUCKET_NAME = "cicatribioskin";
 const region = AWS_BUCKET_REGION = "us-east-2";
@@ -28,6 +37,84 @@ async function uploadFile(Body, Key) {
         reject(err);
       });
   });
+}
+
+// Upload para S3 com configurações específicas para prescrições
+async function uploadToS3(buffer, fileName, contentType = 'application/pdf') {
+  const uploadParams = {
+    Bucket,
+    Key: fileName,
+    Body: buffer,
+    ContentType: contentType,
+    ServerSideEncryption: 'AES256' // Criptografia no servidor
+  };
+
+  try {
+    console.log(`Iniciando upload para S3: ${fileName}`);
+    const result = await s3.send(new PutObjectCommand(uploadParams));
+    
+    // Construir URL do arquivo
+    const fileUrl = `https://${Bucket}.s3.${region}.amazonaws.com/${fileName}`;
+    
+    console.log(`Upload concluído: ${fileName}`);
+    return {
+      success: true,
+      location: fileUrl,
+      key: fileName,
+      etag: result.ETag
+    };
+  } catch (error) {
+    console.error('Erro no upload S3:', error);
+    throw new Error(`Falha no upload: ${error.message}`);
+  }
+}
+
+// Download de arquivo do S3
+async function downloadFromS3(fileName) {
+  const downloadParams = {
+    Bucket,
+    Key: fileName
+  };
+
+  try {
+    console.log(`Baixando arquivo do S3: ${fileName}`);
+    const result = await s3.send(new GetObjectCommand(downloadParams));
+    
+    // Converter stream para buffer se necessário
+    if (result.Body) {
+      return result.Body;
+    } else {
+      throw new Error('Arquivo vazio ou não encontrado');
+    }
+  } catch (error) {
+    console.error('Erro no download S3:', error);
+    if (error.name === 'NoSuchKey') {
+      throw new Error('Arquivo não encontrado no S3');
+    }
+    throw error;
+  }
+}
+
+// Gerar URL assinada para download temporário
+async function getSignedUrlForDownload(fileName, expiresIn = 3600) {
+  const command = new GetObjectCommand({
+    Bucket,
+    Key: fileName
+  });
+
+  try {
+    console.log(`Gerando URL assinada para: ${fileName}`);
+    const signedUrl = await getSignedUrl(s3, command, { expiresIn });
+    
+    return {
+      success: true,
+      url: signedUrl,
+      expiresIn: expiresIn
+    };
+  } catch (error) {
+    console.error('Erro ao gerar URL assinada:', error);
+    throw new Error(`Falha ao gerar URL: ${error.message}`);
+  }
 }
 
 // downloads a file from s3
@@ -72,7 +159,6 @@ async function fileExists(Key) {
   }
 }
 
-
 // delete file from s3
 async function deleteFile(Key) {
   let params = {
@@ -81,7 +167,6 @@ async function deleteFile(Key) {
   }
   try {
     const data = await s3.send(new DeleteObjectCommand(params));
-
     return data;
   } catch (err) {
     console.log("Error", err);
@@ -114,5 +199,11 @@ module.exports = {
   listBuckets,
   createBucket,
   listFileStream,
-  fileExists
+  fileExists,
+  // Novas funções para prescrições
+  uploadToS3,
+  downloadFromS3,
+  getSignedUrlForDownload,
+  s3,
+  Bucket
 }

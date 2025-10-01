@@ -3,6 +3,7 @@ const route = express.Router();
 const models = require('../../models');
 const { mob_tutores, WebAnamneses, WebProtocolos, WebProtocolosAgendas, MobProtocolosSaude } = models;
 const { Op } = require('sequelize');
+const { uploadToS3, getSignedUrlForDownload } = require("../../utils/s3_teste");
 
 // Configuração do Sequelize (igual ao seu arquivo de anamneses)
 const Sequelize = require("sequelize");
@@ -28,7 +29,7 @@ const gerarAgendas = (protocoloId, numDoses, intervalo, tipoIntervalo, dataInici
 
   for (let i = 0; i < numDoses; i++) {
     const dataAplicacao = new Date(dataBase);
-    
+
     // Calcular data baseada no intervalo (primeira dose = data da anamnese)
     if (i > 0) {
       switch (tipoIntervalo) {
@@ -129,7 +130,7 @@ route.delete('/tutores/:id', async (req, res) => {
 // Criar prescrição completa (anamnese + protocolos + agendas)
 route.post('/prescricoes', async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { anamnese, protocolos } = req.body;
 
@@ -221,7 +222,7 @@ route.post('/prescricoes', async (req, res) => {
   } catch (error) {
     // Rollback em caso de erro
     await transaction.rollback();
-    
+
     console.log('ERRO em /prescricoes');
     console.log(error.message);
     res.status(500).json({
@@ -424,115 +425,159 @@ route.get('/prescricoes/veterinario/:veterinarioId', async (req, res) => {
 route.get('/prescricoes/:anamneseId', async (req, res) => {
   try {
     const { anamneseId } = req.params;
-    console.log("Buscando prescrição (SQL) anamneseId:", anamneseId);
+    console.log("Buscando prescrição por ID:", anamneseId);
 
-    const prescricaoSQL = `
-      SELECT 
-        a.id AS anamnese_id,
-        a.web_veterinarios_id,
-        a.mob_animais_id,
-        a.dt_data_anamnese,
-        a.ds_orientacoes,
-        a.ds_quadro_clinico,
-        a.ds_diagnostico,
-        a.ds_tratamento,
-        a.vl_peso,
-        a.ds_temperatura,
-        a.ds_resultados_exames_anteriores,
-        p.id AS protocolo_id,
-        p.mob_protocolos_saude_id,
-        p.nu_doses,
-        p.nu_intervalo_uso,
-        p.tipo_intervalo_uso,
-        p.ds_dosagem,
-        p.st_tipo_protocolo,
-        ps.ds_protocolos_saude AS nome_protocolo,
-        pa.id AS agenda_id,
-        pa.dt_data_aplicacao,
-        pa.st_concluido
-      FROM web_anamneses a
-      LEFT JOIN web_protocolos p ON p.web_anamneses_id = a.id
-      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.mob_protocolos_saude_id
-      LEFT JOIN web_protocolos_agendas pa ON pa.web_protocolos_id = p.id
-      WHERE a.id = :anamneseId
-      ORDER BY p.id, pa.dt_data_aplicacao ASC
-    `;
-
-    const results = await sequelize.query(prescricaoSQL, {
-      replacements: { anamneseId },
+    // Buscar anamnese
+    const [anamneseResults] = await sequelize.query(`
+      SELECT * FROM web_anamneses WHERE id = ?
+    `, {
+      replacements: [anamneseId],
       type: sequelize.QueryTypes.SELECT
     });
 
-    if (results.length === 0) {
-      return res.send(false);
+    if (!anamneseResults) {
+      return res.status(404).json({
+        success: false,
+        message: 'Prescrição não encontrada'
+      });
     }
 
-    // Pegar dados da primeira linha (dados da anamnese)
-    const firstRow = results[0];
+    const anamnese = anamneseResults;
 
+    // Verificar se existe prescrição assinada
+    const [registroAssinado] = await sequelize.query(`
+      SELECT * FROM web_registros_prescricoes 
+      WHERE web_anamneses_id = ? AND status = 'assinada'
+      LIMIT 1
+    `, {
+      replacements: [anamneseId],
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    const assinada = !!registroAssinado;
+
+    // Buscar protocolos
+    const protocolos = await sequelize.query(`
+      SELECT 
+        wp.*,
+        mps.ds_protocolos_saude as nome_protocolo
+      FROM web_protocolos wp
+      LEFT JOIN mob_protocolos_saude mps ON wp.mob_protocolos_saude_id = mps.id
+      WHERE wp.web_anamneses_id = ?
+    `, {
+      replacements: [anamneseId],
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    // Buscar agendas de todos os protocolos
+    const protocoloIds = protocolos.map(p => p.id);
+    let agendas = [];
+
+    if (protocoloIds.length > 0) {
+      agendas = await sequelize.query(`
+        SELECT * FROM web_protocolos_agendas 
+        WHERE web_protocolos_id IN (?)
+        ORDER BY dt_data_aplicacao ASC
+      `, {
+        replacements: [protocoloIds],
+        type: sequelize.QueryTypes.SELECT
+      });
+    }
+
+    // Agrupar agendas por protocolo
+    const agendasPorProtocolo = {};
+    protocolos.forEach(protocolo => {
+      agendasPorProtocolo[protocolo.id] = agendas.filter(
+        agenda => agenda.web_protocolos_id === protocolo.id
+      );
+    });
+
+    // Calcular progresso
+    let totalDoses = agendas.length;
+    let dosesAplicadas = agendas.filter(agenda => agenda.st_concluido === 1).length;
+
+    // Montar resposta da prescrição
     const prescricao = {
-      id: firstRow.anamnese_id,
-      anamnese_id: firstRow.anamnese_id,
-      web_veterinarios_id: firstRow.web_veterinarios_id,
-      mob_animais_id: firstRow.mob_animais_id,
-      dt_data: firstRow.dt_data_anamnese,
-      observacoes: firstRow.ds_orientacoes || null,
+      id: anamnese.id,
+      anamnese_id: anamnese.id,
+      dt_data: anamnese.dt_data_anamnese,
+      assinada: assinada,
+      protocolos: protocolos.map(protocolo => ({
+        ...protocolo,
+        nome_protocolo: protocolo.nome_protocolo || 'Protocolo não identificado'
+      })),
+      agendas: agendasPorProtocolo,
+      status: dosesAplicadas === totalDoses ? 'finalizada' : 'ativa',
+      observacoes: anamnese.ds_orientacoes || null,
       dados_anamnese: {
-        quadro_clinico: firstRow.ds_quadro_clinico || '',
-        diagnostico: firstRow.ds_diagnostico || '',
-        tratamento: firstRow.ds_tratamento || '',
-        peso: firstRow.vl_peso || 0,
-        temperatura: firstRow.ds_temperatura || '',
-        exames_anteriores: firstRow.ds_resultados_exames_anteriores || '',
-        orientacoes: firstRow.ds_orientacoes || ''
-      },
-      protocolos: [],
-      agendas: {}
+        quadro_clinico: anamnese.ds_quadro_clinico,
+        diagnostico: anamnese.ds_diagnostico,
+        tratamento: anamnese.ds_tratamento,
+        peso: anamnese.vl_peso,
+        temperatura: anamnese.ds_temperatura,
+        exames_anteriores: anamnese.ds_resultados_exames_anteriores
+      }
     };
 
-    // Agrupar protocolos e agendas
-    const protocolosMap = {};
+    res.json(prescricao);
 
-    results.forEach((row) => {
-      if (row.protocolo_id && !protocolosMap[row.protocolo_id]) {
-        protocolosMap[row.protocolo_id] = {
-          id: row.protocolo_id,
-          web_anamneses_id: row.anamnese_id,
-          mob_protocolos_saude_id: row.mob_protocolos_saude_id,
-          nu_doses: row.nu_doses || 1,
-          nu_intervalo_uso: row.nu_intervalo_uso || 1,
-          tipo_intervalo_uso: row.tipo_intervalo_uso || 'D',
-          ds_dosagem: row.ds_dosagem || '',
-          st_tipo_protocolo: row.st_tipo_protocolo || 0,
-          nome_protocolo: row.nome_protocolo || 'Protocolo não identificado',
-          agendas: []
-        };
-        prescricao.agendas[row.protocolo_id] = [];
-      }
+  } catch (error) {
+    console.log('ERRO em /prescricoes/:anamneseId');
+    console.log(error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar prescrição',
+      error: error.message
+    });
+  }
+});
 
-      if (row.agenda_id && protocolosMap[row.protocolo_id]) {
-        const agenda = {
-          id: row.agenda_id,
-          web_protocolos_id: row.protocolo_id,
-          dt_data_aplicacao: row.dt_data_aplicacao,
-          st_concluido: row.st_concluido
-        };
-        
-        protocolosMap[row.protocolo_id].agendas.push(agenda);
-        prescricao.agendas[row.protocolo_id].push(agenda);
+// Rota para gerar URL de download do PDF assinado
+route.get('/prescricoes/:anamneseId/url-pdf', async (req, res) => {
+  try {
+    const { anamneseId } = req.params;
+    const expiresIn = parseInt(req.query.expiresIn) || 3600; // 1 hora por padrão
+
+    // Buscar registro assinado
+    const registro = await web_registros_prescricoes.findOne({
+      where: {
+        web_anamneses_id: anamneseId,
+        status: 'assinada'
       }
     });
 
-    // Converter protocolos em array
-    prescricao.protocolos = Object.values(protocolosMap);
+    if (!registro) {
+      return res.status(404).json({
+        success: false,
+        message: 'Prescrição assinada não encontrada'
+      });
+    }
 
-    console.log('Prescrição retornada:', JSON.stringify(prescricao, null, 2));
-    res.send(prescricao);
+    if (!registro.arquivo_s3_path) {
+      return res.status(404).json({
+        success: false,
+        message: 'Caminho do arquivo não encontrado'
+      });
+    }
+
+    // Gerar URL assinada
+    const urlData = await getSignedUrlForDownload(registro.arquivo_s3_path, expiresIn);
+
+    res.json({
+      success: true,
+      url: urlData.url,
+      expiresIn: urlData.expiresIn,
+      fileName: `prescricao-${registro.codigo_verificacao}.pdf`,
+      codigoVerificacao: registro.codigo_verificacao
+    });
 
   } catch (error) {
-    console.log('ERRO em /prescricoes/:id (SQL)');
-    console.log(error.message);
-    res.send(false);
+    console.error('Erro ao gerar URL:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao gerar URL de download',
+      error: error.message
+    });
   }
 });
 
@@ -707,8 +752,8 @@ route.get('/protocolos/animal/:animalId', async (req, res) => {
 
     // Buscar protocolos das anamneses
     const protocolos = await WebProtocolos.findAll({
-      where: { 
-        web_anamneses_id: anamneseIds 
+      where: {
+        web_anamneses_id: anamneseIds
       },
       include: [
         {
@@ -1009,6 +1054,416 @@ route.get('/prescricoes/animal/:animalId/estatisticas', async (req, res) => {
       success: false,
       message: 'Erro ao buscar estatísticas',
       error: error.message
+    });
+  }
+});
+
+const gerarCodigoVerificacao = () => {
+  const ano = new Date().getFullYear();
+  const timestamp = Date.now().toString().slice(-6);
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `RX-${ano}-${timestamp}${random}`;
+};
+
+const crypto = require('crypto');
+const { web_registros_prescricoes } = models;
+const multer = require('multer');
+
+// Configurar multer para upload de PDFs
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas arquivos PDF são permitidos'), false);
+    }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB máximo
+  }
+});
+
+// Função auxiliar para gerar hash dos dados
+function gerarHashDados(dados) {
+  // Ordenar as chaves para garantir consistência
+  const conteudoOrdenado = JSON.stringify(dados, Object.keys(dados).sort());
+  return crypto.createHash('sha256').update(conteudoOrdenado).digest('hex');
+}
+
+// Buscar dados para PDF (sem gerar o arquivo)
+route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { anamneseId } = req.params;
+
+    // Buscar dados completos da prescrição
+    const prescricaoSQL = `
+      SELECT 
+        a.id AS anamnese_id,
+        a.web_veterinarios_id,
+        a.mob_animais_id,
+        a.dt_data_anamnese,
+        a.ds_quadro_clinico,
+        a.ds_diagnostico,
+        a.ds_tratamento,
+        a.ds_orientacoes,
+        a.vl_peso,
+        a.ds_temperatura,
+        a.ds_resultados_exames_anteriores,
+        p.id AS protocolo_id,
+        p.mob_protocolos_saude_id,
+        p.nu_doses,
+        p.nu_intervalo_uso,
+        p.tipo_intervalo_uso,
+        p.ds_dosagem,
+        p.st_tipo_protocolo,
+        ps.ds_protocolos_saude AS nome_protocolo,
+        v.no_completo,
+        v.nu_crmv,
+        v.ds_estado_crmv,
+        v.ds_email,
+        v.nu_telefone_completo,
+        an.no_nome,
+        an.ds_especie,
+        an.ds_sexo,
+        an.vl_idade,
+        an.id
+      FROM web_anamneses a
+      LEFT JOIN web_protocolos p ON p.web_anamneses_id = a.id
+      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.mob_protocolos_saude_id
+      INNER JOIN web_veterinarios v ON v.id = a.web_veterinarios_id
+      INNER JOIN mob_animais an ON an.id = a.mob_animais_id
+      WHERE a.id = :anamneseId
+    `;
+
+    const resultados = await sequelize.query(prescricaoSQL, {
+      replacements: { anamneseId },
+      type: sequelize.QueryTypes.SELECT,
+      transaction
+    });
+
+    if (resultados.length === 0) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Prescrição não encontrada'
+      });
+    }
+
+    // Organizar dados para o PDF
+    const primeiraLinha = resultados[0];
+
+    const anamnese = {
+      dt_data_anamnese: primeiraLinha.dt_data_anamnese,
+      ds_quadro_clinico: primeiraLinha.ds_quadro_clinico,
+      ds_diagnostico: primeiraLinha.ds_diagnostico,
+      ds_tratamento: primeiraLinha.ds_tratamento,
+      ds_orientacoes: primeiraLinha.ds_orientacoes,
+      vl_peso: primeiraLinha.vl_peso,
+      ds_temperatura: primeiraLinha.ds_temperatura,
+      ds_resultados_exames_anteriores: primeiraLinha.ds_resultados_exames_anteriores
+    };
+
+    const veterinario = {
+      no_completo: primeiraLinha.no_completo,
+      nu_crmv: primeiraLinha.nu_crmv,
+      ds_estado_crmv: primeiraLinha.ds_estado_crmv,
+      ds_email: primeiraLinha.ds_email,
+      nu_telefone_completo: primeiraLinha.nu_telefone_completo
+    };
+
+    const animal = {
+      no_nome: primeiraLinha.no_nome,
+      ds_especie: primeiraLinha.ds_especie,
+      ds_sexo: primeiraLinha.ds_sexo,
+      vl_idade: primeiraLinha.vl_idade,
+      id: primeiraLinha.id
+    };
+
+    // Agrupar protocolos
+    const protocolosMap = {};
+    resultados.forEach(linha => {
+      if (linha.protocolo_id && !protocolosMap[linha.protocolo_id]) {
+        protocolosMap[linha.protocolo_id] = {
+          nome_protocolo: linha.nome_protocolo,
+          ds_dosagem: linha.ds_dosagem,
+          nu_doses: linha.nu_doses,
+          nu_intervalo_uso: linha.nu_intervalo_uso,
+          tipo_intervalo_uso: linha.tipo_intervalo_uso,
+          st_tipo_protocolo: linha.st_tipo_protocolo
+        };
+      }
+    });
+
+    const protocolos = Object.values(protocolosMap);
+
+    const dadosOrganizados = {
+      anamnese,
+      veterinario,
+      animal,
+      protocolos
+    };
+
+    // GERAR HASH DOS DADOS (sem o código de verificação)
+    const hashDados = gerarHashDados(dadosOrganizados);
+
+    // Verificar se já existe registro de assinatura pendente
+    const registroExistente = await web_registros_prescricoes.findOne({
+      where: {
+        web_anamneses_id: anamneseId,
+        status: 'pendente'
+      },
+      transaction
+    });
+
+    let codigoVerificacao;
+
+    if (registroExistente) {
+      // Verificar se ainda está dentro do prazo
+      const agora = new Date();
+      if (agora < registroExistente.dt_expiracao) {
+        // AINDA VÁLIDO - verificar se o hash é o mesmo
+        if (registroExistente.hash_original === hashDados) {
+          // Hash idêntico, pode usar o código existente
+          codigoVerificacao = registroExistente.codigo_verificacao;
+        } else {
+          // Dados mudaram - marcar como expirado e criar novo
+          await registroExistente.update({ status: 'expirada' }, { transaction });
+          codigoVerificacao = gerarCodigoVerificacao();
+
+          const agora = new Date();
+          const expiracao = new Date(agora.getTime() + 30 * 60 * 1000);
+
+          await web_registros_prescricoes.create({
+            web_anamneses_id: anamneseId,
+            codigo_verificacao: codigoVerificacao,
+            status: 'pendente',
+            hash_original: hashDados,
+            dt_criacao: agora,
+            dt_expiracao: expiracao
+          }, { transaction });
+        }
+      } else {
+        // EXPIRADO - marcar como expirado e criar novo
+        await registroExistente.update({ status: 'expirada' }, { transaction });
+        codigoVerificacao = gerarCodigoVerificacao();
+
+        const agora = new Date();
+        const expiracao = new Date(agora.getTime() + 30 * 60 * 1000);
+
+        await web_registros_prescricoes.create({
+          web_anamneses_id: anamneseId,
+          codigo_verificacao: codigoVerificacao,
+          status: 'pendente',
+          hash_original: hashDados,
+          dt_criacao: agora,
+          dt_expiracao: expiracao
+        }, { transaction });
+      }
+    } else {
+      // CRIAR NOVO REGISTRO
+      codigoVerificacao = gerarCodigoVerificacao();
+
+      const agora = new Date();
+      const expiracao = new Date(agora.getTime() + 30 * 60 * 1000);
+
+      await web_registros_prescricoes.create({
+        web_anamneses_id: anamneseId,
+        codigo_verificacao: codigoVerificacao,
+        status: 'pendente',
+        hash_original: hashDados,
+        dt_criacao: agora,
+        dt_expiracao: expiracao
+      }, { transaction });
+    }
+
+    // COMMIT APENAS UMA VEZ, NO FINAL
+    await transaction.commit();
+
+    // Retornar dados organizados para o frontend (incluindo o hash para enviar no upload)
+    res.json({
+      success: true,
+      codigoVerificacao,
+      hashDados, // Enviar o hash para o frontend incluir no upload
+      dados: {
+        codigoVerificacao,
+        anamnese,
+        veterinario,
+        animal,
+        protocolos
+      }
+    });
+
+  } catch (error) {
+    // ROLLBACK APENAS SE A TRANSAÇÃO AINDA ESTIVER ATIVA
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
+
+    console.error('Erro ao buscar dados para PDF:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro interno ao buscar dados para PDF',
+      error: error.message
+    });
+  }
+});
+
+const { verifyPDF } = require('../../utils/pdfVerification');
+
+route.post('/prescricoes/:anamneseId/upload-assinado',
+  upload.single('pdfAssinado'),
+  async (req, res) => {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const { anamneseId } = req.params;
+      const arquivo = req.file;
+
+      if (!arquivo) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'Arquivo PDF é obrigatório'
+        });
+      }
+
+      // Verificar se o PDF tem assinatura
+      const verificationResult = verifyPDF(arquivo.buffer);
+      console.log(verificationResult)
+
+      if (!verificationResult.verified) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'O arquivo PDF não contém uma assinatura digital válida.'
+        });
+      }
+
+      // Buscar registro pendente
+      const registro = await web_registros_prescricoes.findOne({
+        where: {
+          web_anamneses_id: anamneseId,
+          status: 'pendente'
+        },
+        transaction
+      });
+
+      if (!registro) {
+        await transaction.rollback();
+        return res.status(404).json({
+          success: false,
+          message: 'Registro de prescrição não encontrado ou já processado'
+        });
+      }
+
+      // Verificar se ainda está dentro do prazo
+      const agora = new Date();
+      if (agora > registro.dt_expiracao) {
+        await registro.update({ status: 'expirada' }, { transaction });
+        await transaction.commit();
+        return res.status(400).json({
+          success: false,
+          message: 'Tempo para upload expirado. Gere um novo PDF.'
+        });
+      }
+
+      // Nome do arquivo no S3
+      const nomeArquivo = `prescricoes/${anamneseId}/${registro.codigo_verificacao}-assinado.pdf`;
+
+      // Upload para S3
+      const urlS3 = await uploadToS3(arquivo.buffer, nomeArquivo);
+
+      // Atualizar registro
+      await registro.update({
+        status: 'assinada',
+        arquivo_s3_path: nomeArquivo,
+        dt_assinatura: agora,
+        dt_upload: agora
+      }, { transaction });
+
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: 'PDF assinado enviado com sucesso!',
+        codigoVerificacao: registro.codigo_verificacao,
+        urlVerificacao: `${process.env.FRONTEND_URL || ''}/verificar/${registro.codigo_verificacao}`
+      });
+
+    } catch (error) {
+      if (!transaction.finished) {
+        await transaction.rollback();
+      }
+      console.error('Erro no upload:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro interno no upload',
+        error: error.message
+      });
+    }
+  });
+
+// Portal de verificação pública
+route.get('/prescricoes/verificar/:codigo', async (req, res) => {
+  try {
+    const { codigo } = req.params;
+
+    const verificacaoSQL = `
+      SELECT 
+        r.codigo_verificacao,
+        r.status,
+        r.dt_criacao,
+        r.dt_assinatura,
+        r.arquivo_s3_path,
+        v.no_completo,
+        v.nu_crmv,
+        v.ds_estado_crmv,
+        an.dt_data_anamnese
+      FROM web_registros_prescricoes r
+      INNER JOIN web_anamneses an ON an.id = r.web_anamneses_id
+      INNER JOIN web_veterinarios v ON v.id = an.web_veterinarios_id
+      INNER JOIN mob_animais a ON a.id = an.mob_animais_id
+      WHERE r.codigo_verificacao = :codigo
+    `;
+
+    const resultado = await sequelize.query(verificacaoSQL, {
+      replacements: { codigo },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    if (resultado.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Código de verificação não encontrado'
+      });
+    }
+
+    const dados = resultado[0];
+
+    res.json({
+      success: true,
+      dados: {
+        codigoVerificacao: dados.codigo_verificacao,
+        status: dados.status,
+        veterinario: {
+          nome: dados.no_completo,
+          crmv: `${dados.nu_crmv}-${dados.ds_estado_crmv}`
+        },
+        dataGeracao: dados.dt_criacao,
+        dataAssinatura: dados.dt_assinatura,
+        dataConsulta: dados.dt_data_anamnese,
+        temArquivo: !!dados.arquivo_s3_path
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro na verificação:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro interno na verificação'
     });
   }
 });
