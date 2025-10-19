@@ -414,7 +414,7 @@ route.get('/prescricao/protocolos/anamnese/:anamneseId', async (req, res) => {
       SELECT 
         p.id,
         p.web_anamneses_id,
-        p.mob_protocolos_saude_id,
+        p.web_protocolos_saude_id,
         p.nu_doses,
         p.nu_intervalo_uso,
         p.tipo_intervalo_uso,
@@ -424,7 +424,7 @@ route.get('/prescricao/protocolos/anamnese/:anamneseId', async (req, res) => {
         p.created_at,
         p.updated_at
       FROM web_protocolos p
-      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.mob_protocolos_saude_id
+      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
       WHERE p.web_anamneses_id = :anamneseId
       ORDER BY p.id ASC
     `;
@@ -646,7 +646,7 @@ route.get('/prescricoes/doses/:doseId', async (req, res) => {
         p.st_tipo_protocolo
       FROM web_protocolos_agendas pa
       INNER JOIN web_protocolos p ON p.id = pa.web_protocolos_id
-      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.mob_protocolos_saude_id
+      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
       WHERE pa.id = :doseId
     `;
 
