@@ -167,7 +167,7 @@ route.post('/prescricoes', async (req, res) => {
       // Criar o protocolo
       const protocoloCriado = await WebProtocolos.create({
         web_anamneses_id: anamneseCriada.id,
-        mob_protocolos_saude_id: protocolo.mob_protocolos_saude_id,
+        web_protocolos_saude_id: protocolo.web_protocolos_saude_id,
         nu_doses: protocolo.nu_doses,
         nu_intervalo_uso: protocolo.nu_intervalo_uso,
         tipo_intervalo_uso: protocolo.tipo_intervalo_uso,
@@ -305,7 +305,7 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
     for (const protocolo of protocolos || []) {
       const protocoloCriado = await WebProtocolos.create({
         web_anamneses_id: anamneseId,
-        mob_protocolos_saude_id: protocolo.mob_protocolos_saude_id,
+        web_protocolos_saude_id: protocolo.web_protocolos_saude_id,
         nu_doses: protocolo.nu_doses,
         nu_intervalo_uso: protocolo.nu_intervalo_uso,
         tipo_intervalo_uso: protocolo.tipo_intervalo_uso,
@@ -462,7 +462,7 @@ route.get('/prescricoes/:anamneseId', async (req, res) => {
         wp.*,
         mps.ds_protocolos_saude as nome_protocolo
       FROM web_protocolos wp
-      LEFT JOIN mob_protocolos_saude mps ON wp.mob_protocolos_saude_id = mps.id
+      LEFT JOIN mob_protocolos_saude mps ON wp.web_protocolos_saude_id = mps.id
       WHERE wp.web_anamneses_id = ?
     `, {
       replacements: [anamneseId],
@@ -622,7 +622,7 @@ route.get('/prescricoes/animal/:animalId', async (req, res) => {
         pa.st_concluido
       FROM web_anamneses a
       INNER JOIN web_protocolos p ON p.web_anamneses_id = a.id
-      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.mob_protocolos_saude_id
+      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
       LEFT JOIN web_protocolos_agendas pa ON pa.web_protocolos_id = p.id
       WHERE a.mob_animais_id = :animalId
       ORDER BY a.dt_data_anamnese DESC, p.id, pa.dt_data_aplicacao ASC
@@ -1113,7 +1113,7 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
         a.ds_temperatura,
         a.ds_resultados_exames_anteriores,
         p.id AS protocolo_id,
-        p.mob_protocolos_saude_id,
+        p.web_protocolos_saude_id,
         p.nu_doses,
         p.nu_intervalo_uso,
         p.tipo_intervalo_uso,
@@ -1132,7 +1132,7 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
         an.id
       FROM web_anamneses a
       LEFT JOIN web_protocolos p ON p.web_anamneses_id = a.id
-      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.mob_protocolos_saude_id
+      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
       INNER JOIN web_veterinarios v ON v.id = a.web_veterinarios_id
       INNER JOIN mob_animais an ON an.id = a.mob_animais_id
       WHERE a.id = :anamneseId
