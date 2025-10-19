@@ -360,7 +360,7 @@ route.get('/animais/:id/has-image', async (req, res) => {
 });
 
 // ========= BUSCAR ANAMNESES POR ANIMAL =========
-route.get('/anamneses/animal/:animalId', async (req, res) => {
+route.get('/prescricao/animal/:animalId', async (req, res) => {
   try {
     const { animalId } = req.params;
     console.log("Buscando anamneses por animal:", animalId);
@@ -404,7 +404,7 @@ route.get('/anamneses/animal/:animalId', async (req, res) => {
 });
 
 // ========= BUSCAR PROTOCOLOS E DOSES POR ANAMNESE =========
-route.get('/protocolos/anamnese/:anamneseId', async (req, res) => {
+route.get('/prescricao/protocolos/anamnese/:anamneseId', async (req, res) => {
   try {
     const { anamneseId } = req.params;
     console.log("Buscando protocolos e doses por anamnese:", anamneseId);
@@ -486,7 +486,7 @@ route.get('/protocolos/anamnese/:anamneseId', async (req, res) => {
 });
 
 // ========= CONCLUIR/DESCONCLUIR DOSE =========
-route.put('/doses/:doseId/status', async (req, res) => {
+route.put('/prescricao/doses/:doseId/status', async (req, res) => {
   try {
     const { doseId } = req.params;
     const { st_concluido } = req.body;
@@ -627,7 +627,7 @@ route.get('/prescricoes/:anamneseId/pdf', async (req, res) => {
 });
 
 // ========= ROTA ADICIONAL: BUSCAR DETALHES COMPLETOS DE UMA DOSE =========
-route.get('/doses/:doseId', async (req, res) => {
+route.get('/prescricoes/doses/:doseId', async (req, res) => {
   try {
     const { doseId } = req.params;
     console.log("Buscando detalhes da dose:", doseId);
