@@ -3,6 +3,7 @@ const route = express.Router();
 const models = require('../../models');
 const { mob_animais, mob_tutores } = models;
 const Op = require('sequelize').Op;
+const { sequelize } = models;
 const { uploadProfilePetService } = require('../uploadImagens/service')
 const { uploadFile, deleteFile, getFileStream, fileExists, getSignedUrlForDownload } = require("../../utils/s3_teste");
 
@@ -359,45 +360,192 @@ route.get('/animais/:id/has-image', async (req, res) => {
   }
 });
 
-// ========= BUSCAR ANAMNESES POR ANIMAL =========
-route.get('/prescricao/animal/:animalId', async (req, res) => {
+route.get('/prescricoes/:prescricaoId/detalhes', async (req, res) => {
   try {
-    const { animalId } = req.params;
-    console.log("Buscando anamneses por animal:", animalId);
+    const { prescricaoId } = req.params;
+    console.log("Buscando detalhes da prescrição:", prescricaoId);
 
-    const anamnesesSQL = `
+    const detalhesSQL = `
       SELECT 
-        id,
-        web_veterinarios_id,
-        mob_animais_id,
-        dt_data_anamnese,
-        ds_quadro_clinico,
-        ds_resultados_exames_anteriores,
-        ds_diagnostico,
-        ds_tratamento,
-        ds_orientacoes,
-        vl_peso,
-        ds_temperatura,
-        created_at,
-        updated_at
-      FROM web_anamneses
-      WHERE mob_animais_id = :animalId
-      ORDER BY dt_data_anamnese DESC
+        a.id AS anamnese_id,
+        a.dt_data_anamnese,
+        a.ds_orientacoes,
+        rp.dt_assinatura,
+        rp.codigo_verificacao,
+        rp.arquivo_s3_path,
+        v.no_completo AS veterinario_nome,
+        v.ds_email AS veterinario_email,
+        v.nu_telefone_completo AS veterinario_telefone,
+        v.nu_crmv AS veterinario_crmv,
+        v.ds_estado_crmv AS veterinario_uf_crmv,
+        v.ds_logo_s3 AS veterinario_logo,
+        v.ds_assinatura_s3 AS veterinario_assinatura
+      FROM web_anamneses a
+      INNER JOIN web_registros_prescricoes rp ON rp.web_anamneses_id = a.id
+      LEFT JOIN web_veterinarios v ON v.id = a.web_veterinarios_id
+      WHERE a.id = :prescricaoId
+        AND rp.status = 'assinada'
+      LIMIT 1
     `;
 
-    const anamneses = await sequelize.query(anamnesesSQL, {
+    const resultado = await sequelize.query(detalhesSQL, {
+      replacements: { prescricaoId },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    if (resultado.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Prescrição não encontrada ou não assinada'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: resultado[0]
+    });
+
+  } catch (error) {
+    console.log('ERRO em /prescricoes/:prescricaoId/detalhes');
+    console.log(error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao buscar detalhes da prescrição',
+      error: error.message
+    });
+  }
+});
+
+// ========= BUSCAR ANAMNESES POR ANIMAL =========
+route.get('/prescricoes/assinadas/animal/:animalId', async (req, res) => {
+  try {
+    const { animalId } = req.params;
+    console.log("Buscando prescrições por animal (SQL, snake_case):", animalId);
+
+    // Query SQL
+    const prescricoesSQL = `
+      SELECT 
+        a.id AS anamnese_id,
+        a.dt_data_anamnese,
+        a.ds_orientacoes,
+        p.id AS protocolo_id,
+        ps.ds_protocolos_saude AS nome_protocolo,
+        pa.id AS agenda_id,
+        pa.dt_data_aplicacao,
+        pa.st_concluido,
+        rp.dt_assinatura,
+        rp.codigo_verificacao,
+        rp.arquivo_s3_path
+      FROM web_anamneses a
+      INNER JOIN web_registros_prescricoes rp ON rp.web_anamneses_id = a.id
+        AND rp.status = 'assinada'
+      INNER JOIN web_protocolos p ON p.web_anamneses_id = a.id
+      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
+      LEFT JOIN web_protocolos_agendas pa ON pa.web_protocolos_id = p.id
+      WHERE a.mob_animais_id = :animalId
+      ORDER BY a.dt_data_anamnese DESC, p.id, pa.dt_data_aplicacao ASC
+    `;
+
+    // Executar query
+    const results = await sequelize.query(prescricoesSQL, {
       replacements: { animalId },
       type: sequelize.QueryTypes.SELECT
     });
 
-    res.json(anamneses || []);
+    // Agrupar resultados por anamnese e protocolo
+    const prescricoesMap = {};
+
+    results.forEach((row) => {
+      // Criar anamnese se não existir
+      if (!prescricoesMap[row.anamnese_id]) {
+        prescricoesMap[row.anamnese_id] = {
+          id: row.anamnese_id,
+          anamnese_id: row.anamnese_id,
+          dt_data: row.dt_data_anamnese,
+          dt_assinatura: row.dt_assinatura,
+          codigo_verificacao: row.codigo_verificacao,
+          arquivo_s3_path: row.arquivo_s3_path,
+          protocolos: {},
+          agendas: {},
+          observacoes: row.ds_orientacoes || null,
+          status: 'ativa',
+          progresso: {
+            totalDoses: 0,
+            dosesAplicadas: 0,
+            percentual: 0
+          }
+        };
+      }
+
+      const anamnese = prescricoesMap[row.anamnese_id];
+
+      // Criar protocolo se não existir
+      if (row.protocolo_id && !anamnese.protocolos[row.protocolo_id]) {
+        anamnese.protocolos[row.protocolo_id] = {
+          id: row.protocolo_id,
+          nome_protocolo: row.nome_protocolo || 'Protocolo não identificado',
+          agendas: []
+        };
+        anamnese.agendas[row.protocolo_id] = [];
+      }
+
+      // Adicionar agenda
+      if (row.agenda_id && anamnese.protocolos[row.protocolo_id]) {
+        anamnese.protocolos[row.protocolo_id].agendas.push({
+          id: row.agenda_id,
+          dt_data_aplicacao: row.dt_data_aplicacao,
+          st_concluido: row.st_concluido
+        });
+        anamnese.agendas[row.protocolo_id].push({
+          id: row.agenda_id,
+          dt_data_aplicacao: row.dt_data_aplicacao,
+          st_concluido: row.st_concluido
+        });
+      }
+    });
+
+    // Calcular status e progresso
+    const prescricoes = Object.values(prescricoesMap).map((anamnese) => {
+      let totalDoses = 0;
+      let dosesAplicadas = 0;
+      let temDoseAtrasada = false;
+      const agora = new Date();
+
+      Object.values(anamnese.protocolos).forEach((protocolo) => {
+        totalDoses += protocolo.agendas.length;
+        protocolo.agendas.forEach((agenda) => {
+          if (agenda.st_concluido === 1) dosesAplicadas++;
+          else if (new Date(agenda.dt_data_aplicacao) < agora) temDoseAtrasada = true;
+        });
+      });
+
+      let status = 'ativa';
+      if (totalDoses === 0) status = 'pendente';
+      else if (dosesAplicadas === totalDoses) status = 'finalizada';
+      else if (temDoseAtrasada) status = 'atrasada';
+      else if (dosesAplicadas > 0) status = 'em_andamento';
+
+      anamnese.status = status;
+      anamnese.progresso = {
+        totalDoses,
+        dosesAplicadas,
+        percentual: totalDoses > 0 ? Math.round((dosesAplicadas / totalDoses) * 100) : 0
+      };
+
+      anamnese.protocolos = Object.values(anamnese.protocolos);
+
+      return anamnese;
+    });
+
+    res.json(prescricoes);
 
   } catch (error) {
-    console.log('ERRO em /anamneses/animal/:animalId');
+    console.log('ERRO em /prescricoes/animal/:animalId (SQL)');
     console.log(error.message);
+    console.log(error)
     res.status(500).json({
       success: false,
-      message: 'Erro ao buscar anamneses do animal',
+      message: 'Erro ao buscar prescrições do animal',
       error: error.message
     });
   }
@@ -421,8 +569,8 @@ route.get('/prescricao/protocolos/anamnese/:anamneseId', async (req, res) => {
         p.ds_dosagem,
         p.st_tipo_protocolo,
         ps.ds_protocolos_saude as nome_protocolo,
-        p.created_at,
-        p.updated_at
+        p.createdAt,
+        p.updatedAt
       FROM web_protocolos p
       LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
       WHERE p.web_anamneses_id = :anamneseId
@@ -446,8 +594,8 @@ route.get('/prescricao/protocolos/anamnese/:anamneseId', async (req, res) => {
         web_protocolos_id,
         dt_data_aplicacao,
         st_concluido,
-        created_at,
-        updated_at
+        createdAt,
+        updatedAt
       FROM web_protocolos_agendas
       WHERE web_protocolos_id IN (:protocoloIds)
       ORDER BY dt_data_aplicacao ASC
@@ -505,7 +653,7 @@ route.put('/prescricao/doses/:doseId/status', async (req, res) => {
     const updateSQL = `
       UPDATE web_protocolos_agendas
       SET st_concluido = :st_concluido,
-          updated_at = NOW()
+          updatedAt = NOW()
       WHERE id = :doseId
     `;
 
@@ -528,8 +676,8 @@ route.put('/prescricao/doses/:doseId/status', async (req, res) => {
         web_protocolos_id,
         dt_data_aplicacao,
         st_concluido,
-        created_at,
-        updated_at
+        createdAt,
+        updatedAt
       FROM web_protocolos_agendas
       WHERE id = :doseId
     `;
@@ -638,8 +786,8 @@ route.get('/prescricoes/doses/:doseId', async (req, res) => {
         pa.web_protocolos_id,
         pa.dt_data_aplicacao,
         pa.st_concluido,
-        pa.created_at,
-        pa.updated_at,
+        pa.createdAt,
+        pa.updatedAt,
         p.web_anamneses_id,
         p.ds_dosagem,
         ps.ds_protocolos_saude as nome_protocolo,
