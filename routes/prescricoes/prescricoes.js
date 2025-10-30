@@ -462,7 +462,7 @@ route.get('/prescricoes/:anamneseId', async (req, res) => {
         wp.*,
         mps.ds_protocolos_saude as nome_protocolo
       FROM web_protocolos wp
-      LEFT JOIN mob_protocolos_saude mps ON wp.web_protocolos_saude_id = mps.id
+      LEFT JOIN web_protocolos_saude mps ON wp.web_protocolos_saude_id = mps.id
       WHERE wp.web_anamneses_id = ?
     `, {
       replacements: [anamneseId],
@@ -617,9 +617,11 @@ route.get('/prescricoes/animal/:animalId', async (req, res) => {
         a.ds_orientacoes,
         p.id AS protocolo_id,
         ps.ds_protocolos_saude AS nome_protocolo,
+        ps.web_tipo_protocolos_saude_id,
         pa.id AS agenda_id,
         pa.dt_data_aplicacao,
-        pa.st_concluido
+        pa.st_concluido,
+        p.nu_intervalo_uso,
       FROM web_anamneses a
       INNER JOIN web_protocolos p ON p.web_anamneses_id = a.id
       LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
@@ -661,6 +663,8 @@ route.get('/prescricoes/animal/:animalId', async (req, res) => {
       // Criar protocolo se não existir
       if (row.protocolo_id && !anamnese.protocolos[row.protocolo_id]) {
         anamnese.protocolos[row.protocolo_id] = {
+          nu_intervalo_uso:row.nu_intervalo_uso,
+          st_tipo_protocolo: row.web_tipo_protocolos_saude_id,
           id: row.protocolo_id,
           nome_protocolo: row.nome_protocolo || 'Protocolo não identificado',
           agendas: []
