@@ -621,7 +621,7 @@ route.get('/prescricoes/animal/:animalId', async (req, res) => {
         pa.id AS agenda_id,
         pa.dt_data_aplicacao,
         pa.st_concluido,
-        p.nu_intervalo_uso,
+        p.nu_intervalo_uso
       FROM web_anamneses a
       INNER JOIN web_protocolos p ON p.web_anamneses_id = a.id
       LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
