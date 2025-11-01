@@ -621,10 +621,12 @@ route.get('/prescricoes/animal/:animalId', async (req, res) => {
         pa.id AS agenda_id,
         pa.dt_data_aplicacao,
         pa.st_concluido,
-        p.nu_intervalo_uso
+        p.nu_intervalo_uso,
+        p.ds_dosagem,
+        p.tipo_intervalo_uso
       FROM web_anamneses a
       INNER JOIN web_protocolos p ON p.web_anamneses_id = a.id
-      LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
+      LEFT JOIN web_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
       LEFT JOIN web_protocolos_agendas pa ON pa.web_protocolos_id = p.id
       WHERE a.mob_animais_id = :animalId
       ORDER BY a.dt_data_anamnese DESC, p.id, pa.dt_data_aplicacao ASC
@@ -664,6 +666,8 @@ route.get('/prescricoes/animal/:animalId', async (req, res) => {
       if (row.protocolo_id && !anamnese.protocolos[row.protocolo_id]) {
         anamnese.protocolos[row.protocolo_id] = {
           nu_intervalo_uso:row.nu_intervalo_uso,
+          tipo_intervalo_uso: row.tipo_intervalo_uso,
+          ds_dosagem: row.ds_dosagem,
           st_tipo_protocolo: row.web_tipo_protocolos_saude_id,
           id: row.protocolo_id,
           nome_protocolo: row.nome_protocolo || 'Protocolo não identificado',
