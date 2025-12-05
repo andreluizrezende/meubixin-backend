@@ -243,10 +243,6 @@ route.put('/medicamentos/:id', async (req, res) => {
       nu_doses: nu_reagendamentos || medicamentoAtual.nu_doses // Usar o novo valor ou manter o atual
     }, { where: { id } });
     
-    if (!updatedRows) {
-      console.log('caiu aqui')
-      return res.status(400).json({ message: 'Erro ao atualizar medicamento' });
-    }
     
     // Verificar se houve mudança no horário inicial, intervalo ou número de doses
     const houveMudancaAgenda = (
