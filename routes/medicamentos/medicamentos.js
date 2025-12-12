@@ -146,7 +146,7 @@ route.get('/medicamentos/:mob_medicamentos_id/agendas', async (req, res) => {
       const agendaObj = agenda.toJSON();
 
       const dataCorrigida = moment(agendaObj.dt_administracao)
-        .add(2, 'hours') // ← TROCAR subtract por add
+        .add(0, 'hours') // ← TROCAR subtract por add
         .format('YYYY-MM-DD HH:mm:ss');
 
       return {
