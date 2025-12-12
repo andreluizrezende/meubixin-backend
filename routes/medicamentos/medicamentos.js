@@ -130,19 +130,32 @@ route.get('/medicamentos/:mob_animal_id', async (req, res) => {
   }
 });
 
-// Buscar agendas de um medicamento específico
+
 route.get('/medicamentos/:mob_medicamentos_id/agendas', async (req, res) => {
   const { mob_medicamentos_id } = req.params;
 
   try {
-    // Buscar todas as agendas relacionadas ao medicamento
     const agendas = await Mob_medicamentos_agenda.findAll({
       where: { mob_medicamentos_id },
-
       order: [['dt_administracao', 'ASC']]
     });
 
-    return res.status(200).json(agendas);
+    // ✅ CORREÇÃO: Adicionar 3 horas nas datas antes de retornar
+    const agendasCorrigidas = agendas.map(agenda => {
+      const agendaObj = agenda.toJSON();
+      
+      // Converter a data e adicionar 3 horas
+      const dataCorrigida = moment(agendaObj.dt_administracao)
+        .add(3, 'hours')
+        .format('YYYY-MM-DD HH:mm:ss');
+      
+      return {
+        ...agendaObj,
+        dt_administracao: dataCorrigida
+      };
+    });
+
+    return res.status(200).json(agendasCorrigidas);
   } catch (error) {
     console.error('Erro ao buscar agendas:', error);
     return res.status(500).json({ message: 'Erro ao buscar agendas.', error });
