@@ -131,6 +131,7 @@ route.get('/medicamentos/:mob_animal_id', async (req, res) => {
 });
 
 
+// Buscar agendas de um medicamento específico
 route.get('/medicamentos/:mob_medicamentos_id/agendas', async (req, res) => {
   const { mob_medicamentos_id } = req.params;
 
@@ -140,13 +141,12 @@ route.get('/medicamentos/:mob_medicamentos_id/agendas', async (req, res) => {
       order: [['dt_administracao', 'ASC']]
     });
 
-    // ✅ CORREÇÃO: Adicionar 3 horas nas datas antes de retornar
+    // ✅ Subtrair 3 horas para compensar a conversão do frontend
     const agendasCorrigidas = agendas.map(agenda => {
       const agendaObj = agenda.toJSON();
       
-      // Converter a data e adicionar 3 horas
       const dataCorrigida = moment(agendaObj.dt_administracao)
-        .add(3, 'hours')
+        .subtract(3, 'hours')
         .format('YYYY-MM-DD HH:mm:ss');
       
       return {
