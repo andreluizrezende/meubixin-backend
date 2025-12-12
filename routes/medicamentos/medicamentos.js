@@ -3,26 +3,25 @@ const route = express.Router();
 const models = require('../../models');
 const { Mob_medicamentos, Mob_medicamentos_agenda, Mob_tipo_via_administracao } = models;
 
-const moment = require('moment');
+const moment = require('moment-timezone'); // ← ALTERAR NO TOPO DO ARQUIVO
 
-// Criar um novo medicamento com agendamentos
 route.post('/medicamentos', async (req, res) => {
-  const { 
-    mob_animal_id, 
-    no_medicamento, 
-    mob_tipo_via_administracao_id, 
-    ds_dosagem, 
-    ds_observacao, 
-    ds_intervalo_administracao, 
+  const {
+    mob_animal_id,
+    no_medicamento,
+    mob_tipo_via_administracao_id,
+    ds_dosagem,
+    ds_observacao,
+    ds_intervalo_administracao,
     ho_administracao_medicamento,
-    nu_reagendamentos 
+    nu_reagendamentos
   } = req.body;
 
   try {
     // Validação básica
-    if (!mob_animal_id || !no_medicamento || !mob_tipo_via_administracao_id || 
-        !ds_dosagem || ds_intervalo_administracao == null || 
-        !ho_administracao_medicamento || nu_reagendamentos == null) {
+    if (!mob_animal_id || !no_medicamento || !mob_tipo_via_administracao_id ||
+      !ds_dosagem || ds_intervalo_administracao == null ||
+      !ho_administracao_medicamento || nu_reagendamentos == null) {
       return res.status(400).json({ message: 'Todos os campos são obrigatórios.' });
     }
 
@@ -38,50 +37,51 @@ route.post('/medicamentos', async (req, res) => {
       nu_doses: nu_reagendamentos
     });
 
-    // Criação dos registros em mob_medicamentos_agenda
+    // ✅ SOLUÇÃO: Usar moment-timezone com timezone de São Paulo
+    const timezone = 'America/Sao_Paulo';
+
+    // Pegar a data de hoje no timezone correto
+    const hoje = moment.tz(timezone).format('YYYY-MM-DD');
+
+    // Criar a primeira administração combinando a data de hoje com o horário informado
+    const primeiraAdministracao = moment.tz(
+      `${hoje} ${ho_administracao_medicamento}`,
+      'YYYY-MM-DD HH:mm',
+      timezone
+    );
+
+    console.log('📅 Data de hoje (timezone Brasil):', hoje);
+    console.log('⏰ Horário informado:', ho_administracao_medicamento);
+    console.log('✅ Primeira administração:', primeiraAdministracao.format('YYYY-MM-DD HH:mm:ss'));
+
     const agendas = [];
-    
-    // SOLUÇÃO 1: Usando string direta (mais confiável)
-    const hoje = new Date();
-    const ano = hoje.getFullYear();
-    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-    const dia = String(hoje.getDate()).padStart(2, '0');
-    
-    // Criar primeira administração como string no formato YYYY-MM-DD HH:MM:SS
-    const primeiraAdministracaoString = `${ano}-${mes}-${dia} ${ho_administracao_medicamento}:00`;
-    
-    console.log('Data string criada:', primeiraAdministracaoString);
-    
+
     // Primeira administração (hoje) - MARCADA COMO CONCLUÍDA
     agendas.push({
       mob_medicamentos_id: novoMedicamento.id,
-      dt_administracao: primeiraAdministracaoString, // Usar string diretamente
-      st_concluido: 1, // ✅ PRIMEIRA ADMINISTRAÇÃO JÁ CONCLUÍDA
+      dt_administracao: primeiraAdministracao.format('YYYY-MM-DD HH:mm:ss'),
+      st_concluido: 1,
     });
 
     // Agendamentos seguintes (não concluídos)
     for (let i = 2; i <= nu_reagendamentos; i++) {
-      // Calcular próxima data usando moment mas forçando local
-      const proximaData = moment(primeiraAdministracaoString)
-        .add(ds_intervalo_administracao * (i - 1), 'hours')
-        .format('YYYY-MM-DD HH:mm:ss');
-      
-      console.log(`${i}ª administração:`, proximaData);
-      
+      const proximaAdministracao = primeiraAdministracao.clone()
+        .add(ds_intervalo_administracao * (i - 1), 'hours');
+
+      console.log(`${i}ª administração:`, proximaAdministracao.format('YYYY-MM-DD HH:mm:ss'));
+
       agendas.push({
         mob_medicamentos_id: novoMedicamento.id,
-        dt_administracao: proximaData, // Usar string formatada
-        st_concluido: 0, // Próximas administrações não concluídas
+        dt_administracao: proximaAdministracao.format('YYYY-MM-DD HH:mm:ss'),
+        st_concluido: 0,
       });
     }
 
     // Criar os registros em mob_medicamentos_agenda em lote
     await Mob_medicamentos_agenda.bulkCreate(agendas);
 
-    // Log para debug
-    console.log('Agendas criadas:', JSON.stringify(agendas, null, 2));
+    console.log('✅ Agendas criadas com sucesso!');
 
-    // Retornar o novo registro criado
     return res.status(201).json(novoMedicamento);
   } catch (error) {
     console.error('Erro ao criar medicamento:', error);
@@ -191,7 +191,7 @@ route.get('/tipos-via-administracao', async (req, res) => {
 route.get('/medicamento/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const medicamento = await Mob_medicamentos.findOne({ 
+    const medicamento = await Mob_medicamentos.findOne({
       where: { id },
       include: [
         {
@@ -200,7 +200,7 @@ route.get('/medicamento/:id', async (req, res) => {
         }
       ]
     });
-    
+
     medicamento ? res.send(medicamento) : res.send(false);
   } catch (error) {
     console.log('ERRO em /medicamento/:id');
@@ -214,24 +214,24 @@ route.get('/medicamento/:id', async (req, res) => {
 route.put('/medicamentos/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { 
-      no_medicamento, 
-      mob_tipo_via_administracao_id, 
-      ds_dosagem, 
-      ds_observacao, 
-      ds_intervalo_administracao, 
+    const {
+      no_medicamento,
+      mob_tipo_via_administracao_id,
+      ds_dosagem,
+      ds_observacao,
+      ds_intervalo_administracao,
       ho_administracao_medicamento,
       nu_reagendamentos // ← NOVO CAMPO
     } = req.body;
     console.log('cheguei na edição')
-    
+
     // Buscar o medicamento atual para obter dados anteriores
     const medicamentoAtual = await Mob_medicamentos.findOne({ where: { id } });
-    
+
     if (!medicamentoAtual) {
       return res.status(404).json({ message: 'Medicamento não encontrado' });
     }
-    
+
     // Atualizar o registro principal do medicamento
     const [updatedRows] = await Mob_medicamentos.update({
       no_medicamento,
@@ -242,77 +242,77 @@ route.put('/medicamentos/:id', async (req, res) => {
       ho_administracao_medicamento,
       nu_doses: nu_reagendamentos || medicamentoAtual.nu_doses // Usar o novo valor ou manter o atual
     }, { where: { id } });
-    
-    
+
+
     // Verificar se houve mudança no horário inicial, intervalo ou número de doses
     const houveMudancaAgenda = (
       ho_administracao_medicamento !== medicamentoAtual.ho_administracao_medicamento ||
       ds_intervalo_administracao !== medicamentoAtual.ds_intervalo_administracao ||
       (nu_reagendamentos && nu_reagendamentos !== medicamentoAtual.nu_doses)
     );
-    
+
     // Se houve mudança que afeta as agendas, recriar todas as agendas
     if (houveMudancaAgenda) {
       console.log('🔄 Recriando agendas devido a mudanças no horário, intervalo ou número de doses');
-      
+
       // 1. Buscar agendas existentes para verificar quais já foram concluídas
       const agendasExistentes = await Mob_medicamentos_agenda.findAll({
         where: { mob_medicamentos_id: id },
         order: [['dt_administracao', 'ASC']]
       });
-      
+
       // 2. Deletar todas as agendas existentes (concluídas e pendentes)
       await Mob_medicamentos_agenda.destroy({
         where: { mob_medicamentos_id: id }
       });
-      
+
+      // 3. Recriar as agendas com os novos parâmetros
       // 3. Recriar as agendas com os novos parâmetros
       const agendas = [];
       const totalDoses = nu_reagendamentos || medicamentoAtual.nu_doses;
-      
-      // Criar string da data atual
-      const hoje = new Date();
-      const ano = hoje.getFullYear();
-      const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-      const dia = String(hoje.getDate()).padStart(2, '0');
-      
-      const primeiraAdministracaoString = `${ano}-${mes}-${dia} ${ho_administracao_medicamento}:00`;
-      
-      console.log('📅 Nova primeira administração:', primeiraAdministracaoString);
-      
+
+      // ✅ Usar moment-timezone
+      const timezone = 'America/Sao_Paulo';
+      const hoje = moment.tz(timezone).format('YYYY-MM-DD');
+
+      const primeiraAdministracao = moment.tz(
+        `${hoje} ${ho_administracao_medicamento}`,
+        'YYYY-MM-DD HH:mm',
+        timezone
+      );
+
+      console.log('📅 Nova primeira administração:', primeiraAdministracao.format('YYYY-MM-DD HH:mm:ss'));
+
       // Verificar quantas doses já foram administradas na prática
       const dosesJaConcluidas = agendasExistentes.filter(agenda => agenda.st_concluido === 1).length;
-      
+
       // Criar as agendas
       for (let i = 1; i <= totalDoses; i++) {
-        const dataAdministracao = moment(primeiraAdministracaoString)
-          .add(ds_intervalo_administracao * (i - 1), 'hours')
-          .format('YYYY-MM-DD HH:mm:ss');
-        
-        // Determinar se esta dose já foi concluída
-        // Marcar como concluída apenas as doses que realmente já foram dadas
+        const proximaAdministracao = primeiraAdministracao.clone()
+          .add(ds_intervalo_administracao * (i - 1), 'hours');
+
         const jaConcluida = i <= dosesJaConcluidas ? 1 : 0;
-        
+
         agendas.push({
           mob_medicamentos_id: id,
-          dt_administracao: dataAdministracao,
+          dt_administracao: proximaAdministracao.format('YYYY-MM-DD HH:mm:ss'),
           st_concluido: jaConcluida
         });
-        
-        console.log(`📋 ${i}ª dose: ${dataAdministracao} - ${jaConcluida ? 'Concluída' : 'Pendente'}`);
+
+        console.log(`📋 ${i}ª dose: ${proximaAdministracao.format('YYYY-MM-DD HH:mm:ss')} - ${jaConcluida ? 'Concluída' : 'Pendente'}`);
       }
-      
+
       // Criar os novos registros
       await Mob_medicamentos_agenda.bulkCreate(agendas);
-      
+
       console.log('✅ Agendas recriadas com sucesso');
     }
-    
-    res.status(200).json({ 
+
+    res.status(200).json({
       message: 'Medicamento atualizado com sucesso',
-      agendasRecriadas: houveMudancaAgenda 
+      agendasRecriadas: houveMudancaAgenda
     });
-    
+
   } catch (error) {
     console.log('ERRO em /medicamentos/:id');
     console.log(error);
