@@ -144,11 +144,11 @@ route.get('/medicamentos/:mob_medicamentos_id/agendas', async (req, res) => {
     // ✅ Subtrair 3 horas para compensar a conversão do frontend
     const agendasCorrigidas = agendas.map(agenda => {
       const agendaObj = agenda.toJSON();
-      
+
       const dataCorrigida = moment(agendaObj.dt_administracao)
-        .subtract(3, 'hours')
+        .add(3, 'hours') // ← TROCAR subtract por add
         .format('YYYY-MM-DD HH:mm:ss');
-      
+
       return {
         ...agendaObj,
         dt_administracao: dataCorrigida
