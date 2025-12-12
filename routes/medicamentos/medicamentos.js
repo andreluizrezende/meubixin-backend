@@ -48,7 +48,7 @@ route.post('/medicamentos', async (req, res) => {
       `${hoje} ${ho_administracao_medicamento}`,
       'YYYY-MM-DD HH:mm',
       timezone
-    );
+    ).add(3, 'hours'); // ← ADICIONAR ISSO AQUI
 
     console.log('📅 Data de hoje (timezone Brasil):', hoje);
     console.log('⏰ Horário informado:', ho_administracao_medicamento);
@@ -279,7 +279,7 @@ route.put('/medicamentos/:id', async (req, res) => {
         `${hoje} ${ho_administracao_medicamento}`,
         'YYYY-MM-DD HH:mm',
         timezone
-      );
+      ).add(3, 'hours'); // ← ADICIONAR ISSO AQUI
 
       console.log('📅 Nova primeira administração:', primeiraAdministracao.format('YYYY-MM-DD HH:mm:ss'));
 
