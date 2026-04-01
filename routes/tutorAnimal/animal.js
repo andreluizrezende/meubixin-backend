@@ -22,6 +22,65 @@ route.get('/animais', async (req, res) => {
   }
 });
 
+// Adicionar esta rota no arquivo de rotas de animais
+// ANTES das rotas com parâmetros como /animais/:id para evitar conflito de rota
+
+route.get('/animais/completo', async (req, res) => {
+  try {
+    console.log('🔍 Buscando todos os animais com dados dos tutores...')
+
+    const animais = await mob_animais.findAll({
+      include: [
+        {
+          model: mob_tutores,
+          attributes: ['id', 'no_completo', 'ds_email', 'nu_telefone_completo'],
+          required: false // LEFT JOIN — retorna mesmo sem tutor vinculado
+        }
+      ],
+      order: [['no_nome', 'ASC']]
+    })
+
+    if (!animais) {
+      return res.json([])
+    }
+
+    // Mapear pro shape exato que o AnimalCard espera
+    const resultado = animais.map(animal => {
+      const a = animal.toJSON()
+      const tutor = a.mob_tutor || a.mob_tutores || null
+
+      return {
+        id: a.id,
+        mob_tutores_id: a.mob_tutores_id,
+        mob_veterinarios_id: a.mob_veterinarios_id,
+        mob_parcerias_id: a.mob_parcerias_id || null,
+        no_nome: a.no_nome,
+        ds_especie: a.ds_especie,
+        mob_especies_id: a.mob_especies_id || null,
+        ds_sexo: a.ds_sexo,
+        ds_pelagem: a.ds_pelagem,
+        vl_idade: a.vl_idade,
+        vl_peso: a.vl_peso,
+        createdAt: a.createdAt,
+        updatedAt: a.updatedAt,
+        // Campos extras esperados pelo AnimalCard
+        avatar: a.no_nome?.charAt(0)?.toUpperCase() || '?',
+        proprietario: tutor?.no_completo || 'Tutor não informado',
+        email: tutor?.ds_email || 'Email não informado',
+        telefone: tutor?.nu_telefone_completo || 'Telefone não informado'
+      }
+    })
+
+    console.log(`✅ ${resultado.length} animais retornados com dados de tutores`)
+    res.json(resultado)
+
+  } catch (error) {
+    console.log('ERRO em /animais/completo')
+    console.log(error.message)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
 route.get('/animais/:id', async (req, res) => {
   try {
     const { id } = req.params;
