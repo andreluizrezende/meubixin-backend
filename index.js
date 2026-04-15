@@ -44,6 +44,7 @@ const rotaMedicamento = require('./routes/medicamentos/medicamentos')
 const rotaResetPass = require('./routes/resetPassword/resetPassword')
 const rotaPrescricoes = require('./routes/prescricoes/prescricoes')
 const rotaParceiros = require('./routes/parceiros/paceiros')
+const rotaAi = require('./routes/apiAI/apiAi')
 
 app.use('/admin', adminRoutes);
 app.use(rotaInicial);
@@ -78,5 +79,6 @@ app.use(rotaMedicamento);
 app.use(rotaResetPass);
 app.use(rotaPrescricoes);
 app.use(rotaParceiros);
+app.use(rotaAi);
 
 app.listen(PORT, () => console.log(`running on port: ${PORT}`));
