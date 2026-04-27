@@ -632,12 +632,14 @@ route.get('/prescricoes/animal/:animalId', async (req, res) => {
       ORDER BY a.dt_data_anamnese DESC, p.id, pa.dt_data_aplicacao ASC
     `;
 
+    
     // Executar query
     const results = await sequelize.query(prescricoesSQL, {
       replacements: { animalId },
       type: sequelize.QueryTypes.SELECT
     });
-
+    
+    console.log(results)
     // Agrupar resultados por anamnese e protocolo
     const prescricoesMap = {};
 
