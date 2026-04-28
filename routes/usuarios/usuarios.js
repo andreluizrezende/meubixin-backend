@@ -4,7 +4,6 @@ const route = express.Router();
 const models = require("../../models");
 const usuarios = models.mob_usuarios;
 const administradores = models.mob_administradores;
-const veterinarios = models.mob_veterinarios;
 const { sendEmail } = require("../../utils/sendNewPass");
 const mob_animais = require("../../models/mob_animais");
 const Sequelize = require("sequelize");
@@ -25,13 +24,13 @@ route.post("/usuarioRegister", async (req, res) => {
     const st_lgpd = 1;
     await usuarios.create({
       no_completo,
-      ds_senha: hashedPassword,
+      ds_senha:hashedPassword,
       ds_email,
       nu_telefone_completo,
       nu_cpf,
       st_lgpd,
     });
-    const resp = await usuarios.findOne({ where: { nu_cpf, ds_senha: hashedPassword } });
+    const resp = await usuarios.findOne({ where: { nu_cpf, ds_senha:hashedPassword } });
     resp ? res.send(resp) : res.send(false);
   } catch (error) {
     console.log("Erro em /usuarioRegister!");
@@ -43,11 +42,11 @@ route.put("/usuarioEdit", async (req, res) => {
   try {
     const { no_completo, ds_email, nu_telefone_completo, nu_cpf, ds_senha, st_envia_mensagem } = req.body;
 
-    let updateData = {
-      no_completo,
-      ds_email,
-      nu_telefone_completo,
-      nu_cpf
+    let updateData = { 
+      no_completo, 
+      ds_email, 
+      nu_telefone_completo, 
+      nu_cpf 
     };
 
     // Adiciona o campo st_envia_mensagem se ele foi fornecido
@@ -123,37 +122,46 @@ route.post("/usuarioGoogleLogin", async (req, res) => {
 route.post("/usuarioLogin", async (req, res) => {
   try {
     const { nu_cpf, ds_senha } = req.body;
-    // 1. Tenta encontrar na tabela de usuários comuns (Tutores)
-    let user = await usuarios.findOne({ where: { nu_cpf } });
-    let isVeterinario = false;
+    console.log("recebeu no backend::", nu_cpf, ds_senha)
+    const user = await usuarios.findOne({ where: { nu_cpf } });
+    console.log("achou user com cpf??::", user)
 
-    // 2. Se não encontrou, tenta na tabela de veterinários
-    if (!user) {
-      user = await veterinarios.findOne({ where: { ds_cpf: nu_cpf } });
-      if (user) isVeterinario = true;
-    }
 
     if (user) {
       let isMatch;
-      // Validação de senha comum a ambos os perfis
+
+      // Verifica se a senha recebida já está criptografada
       if (ds_senha.startsWith('$2b$')) {
+        console.log("Senha ja criptografada")
+        console.log(ds_senha, "==", user.ds_senha)
+        // Se a senha recebida já está criptografada, compara diretamente
         isMatch = ds_senha === user.ds_senha;
+        console.log('resposta', isMatch)
       } else {
-        isMatch = await bcrypt.compare(ds_senha, user.ds_senha);
+        // Se a senha recebida não está criptografada, segue o fluxo normal
+        if (user.ds_senha.startsWith('$2b$')) {
+          // Senha no banco está criptografada, usa bcrypt para comparar
+          isMatch = await bcrypt.compare(ds_senha, user.ds_senha);
+        } else {
+          // Senha no banco não está criptografada, compara diretamente
+          isMatch = ds_senha === user.ds_senha;
+          if (isMatch) {
+            // Criptografa a senha e atualiza o banco de dados
+            const hashedPassword = await bcrypt.hash(ds_senha, 10);
+            await usuarios.update(
+              { ds_senha: hashedPassword },
+              { where: { nu_cpf } }
+            );
+          }
+        }
       }
 
       if (isMatch) {
+        console.log("resposta do login, ", user);
         const currentDateTime = moment().tz('America/Sao_Paulo').format('YYYY-MM-DD HH:mm:ss');
-        await mob_logs.create({
-          ds_funcionalidade: isVeterinario ? "Autenticação Veterinário" : "Autenticação",
-          nu_cpf,
-          dt_acesso: currentDateTime
-        });
-
-        // Retorna o usuário com a flag de tipo para o frontend
-        const userData = user.toJSON();
-        if (isVeterinario) userData.userType = 4;
-        res.send(userData);
+        console.log("Dados enviados pro log: ", "Autenticação", "Cpf:", nu_cpf, "dt_acesso:", currentDateTime);
+        await mob_logs.create({ ds_funcionalidade: "Autenticação", nu_cpf, dt_acesso: currentDateTime });
+        res.send(user);
       } else {
         res.send(false);
       }
@@ -161,7 +169,8 @@ route.post("/usuarioLogin", async (req, res) => {
       res.send(false);
     }
   } catch (error) {
-    console.log("Erro em /usuarioLogin!", error.message);
+    console.log("Erro em /usuarioLogin!");
+    console.log(error.message);
     res.status(500).send("Erro interno do servidor");
   }
 });
@@ -169,34 +178,60 @@ route.post("/usuarioLogin", async (req, res) => {
 route.post("/usuarioLoginIntegrado", async (req, res) => {
   try {
     const { nu_cpf, ds_senha } = req.body;
-    
-    // Tenta primeiro usuários comuns (Tutores/ADM)
+    console.log("Tentativa de login com CPF:", nu_cpf); // Log para controle
+
     const user = await usuarios.findOne({ where: { nu_cpf } });
     
     if (user) {
-      const isMatch = ds_senha.startsWith('$2b$') ? 
-        ds_senha === user.ds_senha : await bcrypt.compare(ds_senha, user.ds_senha);
+      console.log("Usuário encontrado no banco de dados:", user.id); // Log para controle
 
-      if (!isMatch) return res.send(false);
+      let isMatch;
 
-      const resposta_adm = await administradores.findOne({ where: { mob_usuarios_id: user.id } });
+      // Verifica se a senha recebida já está criptografada
+      if (ds_senha.startsWith('$2b$')) {
+        console.log("Senha recebida já está criptografada. Comparando diretamente."); // Log para controle
+        isMatch = ds_senha === user.ds_senha;
+      } else {
+        console.log("Senha recebida não está criptografada. Usando bcrypt para comparar."); // Log para controle
+        isMatch = await bcrypt.compare(ds_senha, user.ds_senha);
+      }
+
+      if (!isMatch) {
+        console.log("Senha incorreta para o usuário:", user.id); // Log para controle
+        return res.send(false);
+      }
+
+      console.log("Senha válida. Verificando perfil do administrador..."); // Log para controle
+
+      const resposta_adm = await administradores.findOne({
+        where: { mob_usuarios_id: user.id },
+      });
+
+      console.log("Resposta do administrador:", resposta_adm); // Log para controle
       
       if (resposta_adm != null) {
-        return res.send(JSON.stringify(resposta_adm.ds_perfil === 'parceiro' ? 2 : 3));
+        // Verifica se o campo ds_perfil é igual a 'parceiro'
+        if (resposta_adm.ds_perfil === 'parceiro') {
+          console.log("Usuário é um parceiro. Retornando 2."); // Log para controle
+          return res.send(JSON.stringify(2));
+        }
+        
+        // Caso contrário, retorna 3 para administradores comuns
+        console.log("Usuário é um administrador comum. Retornando 3."); // Log para controle
+        return res.send(JSON.stringify(3));
+      } else {
+        // Retorna 1 para usuários comuns
+        console.log("Usuário é comum. Retornando 1."); // Log para controle
+        return res.send(JSON.stringify(1));
       }
-      return res.send(JSON.stringify(1));
-    } 
-
-    // Se não encontrou em usuários, tenta veterinários
-    const vet = await veterinarios.findOne({ where: { ds_cpf: nu_cpf } });
-    if (vet) {
-      const isMatchVet = await bcrypt.compare(ds_senha, vet.ds_senha);
-      if (isMatchVet) return res.send(JSON.stringify(4)); // Código para Veterinário[cite: 3]
+    } else {
+      console.log("Usuário não encontrado para o CPF:", nu_cpf); // Log para controle
+      res.send(false);
     }
-
-    res.send(false);
   } catch (error) {
-    res.status(500).send("Erro interno");
+    console.log("Erro em /usuarioLoginIntegrado!");
+    console.log(error.message);
+    res.status(500).send("Erro interno do servidor"); // Resposta em caso de erro
   }
 });
 
@@ -231,7 +266,7 @@ route.get("/usuario/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const resposta = await usuarios.findOne({
-      where: { id },
+      where: { id},
     });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
@@ -245,48 +280,48 @@ route.post("/recuperarSenha", async (req, res) => {
   try {
     const { nu_cpf, ds_email, nu_telefone_completo } = req.body;
     console.log("passou aqui", req.body);
-
+    
     let whereClause = { nu_cpf };
     console.log("passou aqui 2");
-
+    
     // Adiciona o critério de busca baseado no que foi fornecido (email ou telefone)
     if (ds_email) {
       whereClause.ds_email = ds_email;
     } else if (nu_telefone_completo) {
       // Usaremos uma abordagem diferente para garantir precisão na busca
       const { Op } = require('sequelize');
-
+      
       // Normaliza o número removendo caracteres não numéricos
       const numeroLimpo = nu_telefone_completo.replace(/\D/g, '');
-
+      
       // Verifica se o número tem 11 dígitos (com 9) ou 10 dígitos (sem 9)
       const temNoveDigitos = numeroLimpo.length === 11 && numeroLimpo[2] === '9';
       const ddd = numeroLimpo.substring(0, 2);
-
+      
       // Abordagem mais segura: buscar todos os usuários com o CPF
       // e verificar programaticamente o número de telefone
       whereClause = { nu_cpf };
-
+      
       // Fazemos a busca inicial apenas pelo CPF
       const usuarios_encontrados = await usuarios.findAll({ where: whereClause });
-
+      
       // Verificamos cada usuário para ver se o telefone corresponde
       const usuarioEncontrado = usuarios_encontrados.find(user => {
         // Normaliza o telefone do banco removendo caracteres não numéricos
         const telefoneBanco = user.nu_telefone_completo.replace(/\D/g, '');
-
+        
         // Caso 1: Números exatamente iguais
         if (telefoneBanco === numeroLimpo) return true;
-
+        
         // Caso 2: Número do banco tem o 9, mas o informado não tem
         if (temNoveDigitos && telefoneBanco === ddd + numeroLimpo.substring(3)) return true;
-
+        
         // Caso 3: Número informado tem o 9, mas o do banco não tem
         if (!temNoveDigitos && telefoneBanco === ddd + '9' + numeroLimpo.substring(2)) return true;
-
+        
         return false;
       });
-
+      
       if (usuarioEncontrado) {
         return res.send(usuarioEncontrado);
       } else {
@@ -301,7 +336,7 @@ route.post("/recuperarSenha", async (req, res) => {
     // Se chegamos aqui, estamos lidando com busca por e-mail
     console.log(whereClause);
     console.log('até aqui vem');
-
+    
     const resposta = await usuarios.findOne({ where: whereClause });
     console.log(whereClause);
     console.log(resposta);
@@ -316,27 +351,27 @@ route.post("/recuperarSenha", async (req, res) => {
 route.put("/updateSenha", async (req, res) => {
   console.log('ta na rota')
   console.log(req.body)
-
+  
   try {
     const { nu_cpf, ds_email, nu_telefone_completo, ds_senha } = req.body;
     console.log(req.body)
 
     const senha = ds_senha.toString();
     const hashedPassword = await bcrypt.hash(senha, 10);
-
+    
     let resposta;
     let whereClause = { nu_cpf };
-
+    
     // Verifica qual método foi escolhido (e-mail ou telefone)
     if (ds_email) {
       // Recuperação por e-mail
       whereClause.ds_email = ds_email;
-
+      
       resposta = await usuarios.update(
         { ds_senha: hashedPassword },
         { where: whereClause }
       );
-
+      
       if (resposta[0]) {
         res.send(true);
         sendEmail(ds_email, ds_senha); // Envia e-mail com a nova senha
@@ -348,21 +383,21 @@ route.put("/updateSenha", async (req, res) => {
       whereClause.nu_telefone_completo = nu_telefone_completo;
 
       console.log(whereClause)
-
+      
       resposta = await usuarios.update(
         { ds_senha: hashedPassword },
         { where: whereClause }
       );
-
+      
       if (resposta[0]) {
         // Formata o número para o WhatsApp
         let telefone = nu_telefone_completo.replace(/\D/g, ''); // Remove todos caracteres não numéricos
-
+        
         // Se o telefone tiver DDD + 9 dígitos (formato comum no Brasil), remover o 9 extra
         if (telefone.length == 11 && telefone[2] == '9') {
           telefone = telefone.substring(0, 2) + telefone.substring(3);
         }
-
+        
         // Garante que o número está no formato internacional
         if (telefone.startsWith('0')) {
           telefone = telefone.substring(1);
@@ -370,18 +405,18 @@ route.put("/updateSenha", async (req, res) => {
         if (!telefone.startsWith('55')) {
           telefone = '55' + telefone;
         }
-
+        
         const to_number = `${telefone}@s.whatsapp.net`;
-
+        
         // Prepara a mensagem com a senha em negrito
         const message = `Sua nova senha de acesso é: ${ds_senha}. Recomendamos que você a altere após o login.`;
-
+        
         // Prepara o payload
         const payload = {
           "to": to_number,
           "message": message
         };
-
+        
         try {
 
           const whatsappResponse = await axios.post(
@@ -393,10 +428,10 @@ route.put("/updateSenha", async (req, res) => {
               }
             }
           );
-
+          
           console.log('Resposta do envio de WhatsApp:', whatsappResponse.data);
           console.log(`Senha alterada para o telefone ${nu_telefone_completo}. Nova senha: ${ds_senha}`);
-
+          
           res.send(true);
         } catch (whatsappError) {
           console.error('Erro ao enviar mensagem WhatsApp:', whatsappError);
@@ -448,17 +483,17 @@ route.post("/usuarioLoginGoogle", async (req, res) => {
 
     // Busca usuário pelo email
     const user = await usuarios.findOne({ where: { ds_email: email } });
-
+    
     if (user) {
       console.log("Usuário encontrado pelo email:", user.id);
 
       // Log de acesso
       const currentDateTime = moment().tz('America/Sao_Paulo').format('YYYY-MM-DD HH:mm:ss');
       console.log("Dados enviados pro log: ", "Autenticação Google", "Email:", email, "dt_acesso:", currentDateTime);
-      await mob_logs.create({
-        ds_funcionalidade: "Autenticação Google",
+      await mob_logs.create({ 
+        ds_funcionalidade: "Autenticação Google", 
         nu_cpf: user.nu_cpf,
-        dt_acesso: currentDateTime
+        dt_acesso: currentDateTime 
       });
 
       // Verifica o tipo de usuário
@@ -468,7 +503,7 @@ route.post("/usuarioLoginGoogle", async (req, res) => {
       });
 
       console.log("Resposta do administrador:", resposta_adm);
-
+      
       let userType;
       if (resposta_adm != null) {
         if (resposta_adm.ds_perfil === 'parceiro') {
@@ -496,21 +531,6 @@ route.post("/usuarioLoginGoogle", async (req, res) => {
     console.log("Erro em /usuarioLoginGoogle!");
     console.log(error.message);
     res.status(500).send("Erro interno do servidor");
-  }
-});
-
-
-// Nova rota para listar animais vinculados a um veterinário específico[cite: 2]
-route.get("/veterinarios/:id/animais", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const pacientes = await models.mob_animais.findAll({
-      where: { mob_veterinarios_id: id } // Filtra pela coluna de vínculo médico[cite: 1]
-    });
-    res.send(pacientes);
-  } catch (error) {
-    console.log("Erro ao buscar animais do veterinário:", error.message);
-    res.status(500).send("Erro ao buscar pacientes");
   }
 });
 
