@@ -24,13 +24,13 @@ route.post("/usuarioRegister", async (req, res) => {
     const st_lgpd = 1;
     await usuarios.create({
       no_completo,
-      ds_senha:hashedPassword,
+      ds_senha: hashedPassword,
       ds_email,
       nu_telefone_completo,
       nu_cpf,
       st_lgpd,
     });
-    const resp = await usuarios.findOne({ where: { nu_cpf, ds_senha:hashedPassword } });
+    const resp = await usuarios.findOne({ where: { nu_cpf, ds_senha: hashedPassword } });
     resp ? res.send(resp) : res.send(false);
   } catch (error) {
     console.log("Erro em /usuarioRegister!");
@@ -42,11 +42,11 @@ route.put("/usuarioEdit", async (req, res) => {
   try {
     const { no_completo, ds_email, nu_telefone_completo, nu_cpf, ds_senha, st_envia_mensagem } = req.body;
 
-    let updateData = { 
-      no_completo, 
-      ds_email, 
-      nu_telefone_completo, 
-      nu_cpf 
+    let updateData = {
+      no_completo,
+      ds_email,
+      nu_telefone_completo,
+      nu_cpf
     };
 
     // Adiciona o campo st_envia_mensagem se ele foi fornecido
@@ -182,17 +182,16 @@ route.post("/usuarioLoginIntegrado", async (req, res) => {
 
     // 1. Busca o usuário na tabela principal (onde estão todos os CPFs)
     const user = await usuarios.findOne({ where: { nu_cpf } });
-    
+
     if (user) {
       console.log("Usuário encontrado:", user.id);
 
       // 2. Validação de senha (Bcrypt ou Texto Simples)
       let isMatch;
-      if (ds_senha.startsWith('$2b$')) {
-        isMatch = ds_senha === user.ds_senha;
+      if (user.ds_senha.startsWith('$2b$')) {
+        isMatch = await bcrypt.compare(ds_senha, user.ds_senha);
       } else {
-        isMatch = user.ds_senha.startsWith('$2b$') ? 
-          await bcrypt.compare(ds_senha, user.ds_senha) : ds_senha === user.ds_senha;
+        isMatch = ds_senha === user.ds_senha;
       }
 
       if (!isMatch) {
@@ -212,7 +211,7 @@ route.post("/usuarioLoginIntegrado", async (req, res) => {
         if (adminEntry.ds_perfil === 'parceiro') {
           return res.send(JSON.stringify(2));
         }
-        
+
         // NOVIDADE: Se for veterinário -> Tipo 4
         if (adminEntry.ds_perfil === 'veterinario') {
           console.log("Identificado como Veterinário. Retornando 4.");
@@ -265,7 +264,7 @@ route.get("/usuario/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const resposta = await usuarios.findOne({
-      where: { id},
+      where: { id },
     });
     resposta ? res.send(resposta) : res.send(false);
   } catch (error) {
@@ -279,48 +278,48 @@ route.post("/recuperarSenha", async (req, res) => {
   try {
     const { nu_cpf, ds_email, nu_telefone_completo } = req.body;
     console.log("passou aqui", req.body);
-    
+
     let whereClause = { nu_cpf };
     console.log("passou aqui 2");
-    
+
     // Adiciona o critério de busca baseado no que foi fornecido (email ou telefone)
     if (ds_email) {
       whereClause.ds_email = ds_email;
     } else if (nu_telefone_completo) {
       // Usaremos uma abordagem diferente para garantir precisão na busca
       const { Op } = require('sequelize');
-      
+
       // Normaliza o número removendo caracteres não numéricos
       const numeroLimpo = nu_telefone_completo.replace(/\D/g, '');
-      
+
       // Verifica se o número tem 11 dígitos (com 9) ou 10 dígitos (sem 9)
       const temNoveDigitos = numeroLimpo.length === 11 && numeroLimpo[2] === '9';
       const ddd = numeroLimpo.substring(0, 2);
-      
+
       // Abordagem mais segura: buscar todos os usuários com o CPF
       // e verificar programaticamente o número de telefone
       whereClause = { nu_cpf };
-      
+
       // Fazemos a busca inicial apenas pelo CPF
       const usuarios_encontrados = await usuarios.findAll({ where: whereClause });
-      
+
       // Verificamos cada usuário para ver se o telefone corresponde
       const usuarioEncontrado = usuarios_encontrados.find(user => {
         // Normaliza o telefone do banco removendo caracteres não numéricos
         const telefoneBanco = user.nu_telefone_completo.replace(/\D/g, '');
-        
+
         // Caso 1: Números exatamente iguais
         if (telefoneBanco === numeroLimpo) return true;
-        
+
         // Caso 2: Número do banco tem o 9, mas o informado não tem
         if (temNoveDigitos && telefoneBanco === ddd + numeroLimpo.substring(3)) return true;
-        
+
         // Caso 3: Número informado tem o 9, mas o do banco não tem
         if (!temNoveDigitos && telefoneBanco === ddd + '9' + numeroLimpo.substring(2)) return true;
-        
+
         return false;
       });
-      
+
       if (usuarioEncontrado) {
         return res.send(usuarioEncontrado);
       } else {
@@ -335,7 +334,7 @@ route.post("/recuperarSenha", async (req, res) => {
     // Se chegamos aqui, estamos lidando com busca por e-mail
     console.log(whereClause);
     console.log('até aqui vem');
-    
+
     const resposta = await usuarios.findOne({ where: whereClause });
     console.log(whereClause);
     console.log(resposta);
@@ -350,27 +349,27 @@ route.post("/recuperarSenha", async (req, res) => {
 route.put("/updateSenha", async (req, res) => {
   console.log('ta na rota')
   console.log(req.body)
-  
+
   try {
     const { nu_cpf, ds_email, nu_telefone_completo, ds_senha } = req.body;
     console.log(req.body)
 
     const senha = ds_senha.toString();
     const hashedPassword = await bcrypt.hash(senha, 10);
-    
+
     let resposta;
     let whereClause = { nu_cpf };
-    
+
     // Verifica qual método foi escolhido (e-mail ou telefone)
     if (ds_email) {
       // Recuperação por e-mail
       whereClause.ds_email = ds_email;
-      
+
       resposta = await usuarios.update(
         { ds_senha: hashedPassword },
         { where: whereClause }
       );
-      
+
       if (resposta[0]) {
         res.send(true);
         sendEmail(ds_email, ds_senha); // Envia e-mail com a nova senha
@@ -382,21 +381,21 @@ route.put("/updateSenha", async (req, res) => {
       whereClause.nu_telefone_completo = nu_telefone_completo;
 
       console.log(whereClause)
-      
+
       resposta = await usuarios.update(
         { ds_senha: hashedPassword },
         { where: whereClause }
       );
-      
+
       if (resposta[0]) {
         // Formata o número para o WhatsApp
         let telefone = nu_telefone_completo.replace(/\D/g, ''); // Remove todos caracteres não numéricos
-        
+
         // Se o telefone tiver DDD + 9 dígitos (formato comum no Brasil), remover o 9 extra
         if (telefone.length == 11 && telefone[2] == '9') {
           telefone = telefone.substring(0, 2) + telefone.substring(3);
         }
-        
+
         // Garante que o número está no formato internacional
         if (telefone.startsWith('0')) {
           telefone = telefone.substring(1);
@@ -404,18 +403,18 @@ route.put("/updateSenha", async (req, res) => {
         if (!telefone.startsWith('55')) {
           telefone = '55' + telefone;
         }
-        
+
         const to_number = `${telefone}@s.whatsapp.net`;
-        
+
         // Prepara a mensagem com a senha em negrito
         const message = `Sua nova senha de acesso é: ${ds_senha}. Recomendamos que você a altere após o login.`;
-        
+
         // Prepara o payload
         const payload = {
           "to": to_number,
           "message": message
         };
-        
+
         try {
 
           const whatsappResponse = await axios.post(
@@ -427,10 +426,10 @@ route.put("/updateSenha", async (req, res) => {
               }
             }
           );
-          
+
           console.log('Resposta do envio de WhatsApp:', whatsappResponse.data);
           console.log(`Senha alterada para o telefone ${nu_telefone_completo}. Nova senha: ${ds_senha}`);
-          
+
           res.send(true);
         } catch (whatsappError) {
           console.error('Erro ao enviar mensagem WhatsApp:', whatsappError);
@@ -482,17 +481,17 @@ route.post("/usuarioLoginGoogle", async (req, res) => {
 
     // Busca usuário pelo email
     const user = await usuarios.findOne({ where: { ds_email: email } });
-    
+
     if (user) {
       console.log("Usuário encontrado pelo email:", user.id);
 
       // Log de acesso
       const currentDateTime = moment().tz('America/Sao_Paulo').format('YYYY-MM-DD HH:mm:ss');
       console.log("Dados enviados pro log: ", "Autenticação Google", "Email:", email, "dt_acesso:", currentDateTime);
-      await mob_logs.create({ 
-        ds_funcionalidade: "Autenticação Google", 
+      await mob_logs.create({
+        ds_funcionalidade: "Autenticação Google",
         nu_cpf: user.nu_cpf,
-        dt_acesso: currentDateTime 
+        dt_acesso: currentDateTime
       });
 
       // Verifica o tipo de usuário
@@ -502,7 +501,7 @@ route.post("/usuarioLoginGoogle", async (req, res) => {
       });
 
       console.log("Resposta do administrador:", resposta_adm);
-      
+
       let userType;
       if (resposta_adm != null) {
         if (resposta_adm.ds_perfil === 'parceiro') {
@@ -535,15 +534,11 @@ route.post("/usuarioLoginGoogle", async (req, res) => {
 
 route.get("/veterinarios/:id/animais", async (req, res) => {
   try {
-    const { id } = req.params; // ID que vem do Frontend (ex: 8)
-
-    // Buscamos os animais onde o mob_veterinarios_id seja igual ao ID que o Frontend mandou
-    // Nota: Se no banco o vínculo for diferente do ID de usuário, 
-    // precisamos primeiro achar o ID do vet associado ao ID do usuário.
+    const { id } = req.params; 
     const pacientes = await models.mob_animais.findAll({
-      where: { mob_tutores_id: id } // Ou mob_veterinarios_id dependendo do vínculo no seu SQL[cite: 1]
+      // No seu SQL, veterinários usam a coluna mob_veterinarios_id
+      where: { mob_veterinarios_id: id } 
     });
-    
     res.send(pacientes);
   } catch (error) {
     res.status(500).send("Erro ao buscar pacientes");
