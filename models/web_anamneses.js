@@ -37,7 +37,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true
       },
       ds_quadro_clinico: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(2055),
         allowNull: true
       },
       ds_resultados_exames_anteriores: {
@@ -45,11 +45,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true
       },
       ds_diagnostico: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(5055),
         allowNull: true
       },
       ds_tratamento: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(5055),
         allowNull: true
       },
       ds_orientacoes: {
