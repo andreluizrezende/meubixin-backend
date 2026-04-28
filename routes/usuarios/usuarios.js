@@ -178,63 +178,62 @@ route.post("/usuarioLogin", async (req, res) => {
 route.post("/usuarioLoginIntegrado", async (req, res) => {
   try {
     const { nu_cpf, ds_senha } = req.body;
-    console.log("Tentativa de login com CPF:", nu_cpf); // Log para controle
+    console.log("Tentativa de login integrado com CPF:", nu_cpf);
 
+    // 1. Busca o usuário na tabela principal (onde estão todos os CPFs)
     const user = await usuarios.findOne({ where: { nu_cpf } });
     
     if (user) {
-      console.log("Usuário encontrado no banco de dados:", user.id); // Log para controle
+      console.log("Usuário encontrado:", user.id);
 
+      // 2. Validação de senha (Bcrypt ou Texto Simples)
       let isMatch;
-
-      // Verifica se a senha recebida já está criptografada
       if (ds_senha.startsWith('$2b$')) {
-        console.log("Senha recebida já está criptografada. Comparando diretamente."); // Log para controle
         isMatch = ds_senha === user.ds_senha;
       } else {
-        console.log("Senha recebida não está criptografada. Usando bcrypt para comparar."); // Log para controle
-        isMatch = await bcrypt.compare(ds_senha, user.ds_senha);
+        isMatch = user.ds_senha.startsWith('$2b$') ? 
+          await bcrypt.compare(ds_senha, user.ds_senha) : ds_senha === user.ds_senha;
       }
 
       if (!isMatch) {
-        console.log("Senha incorreta para o usuário:", user.id); // Log para controle
+        console.log("Senha incorreta.");
         return res.send(false);
       }
 
-      console.log("Senha válida. Verificando perfil do administrador..."); // Log para controle
-
-      const resposta_adm = await administradores.findOne({
+      // 3. Verifica se o usuário tem um perfil na tabela de administradores
+      const adminEntry = await administradores.findOne({
         where: { mob_usuarios_id: user.id },
       });
 
-      console.log("Resposta do administrador:", resposta_adm); // Log para controle
-      
-      if (resposta_adm != null) {
-        // Verifica se o campo ds_perfil é igual a 'parceiro'
-        if (resposta_adm.ds_perfil === 'parceiro') {
-          console.log("Usuário é um parceiro. Retornando 2."); // Log para controle
+      console.log("Perfil administrativo encontrado:", adminEntry ? adminEntry.ds_perfil : "Nenhum");
+
+      if (adminEntry) {
+        // Se for parceiro -> Tipo 2
+        if (adminEntry.ds_perfil === 'parceiro') {
           return res.send(JSON.stringify(2));
         }
         
-        // Caso contrário, retorna 3 para administradores comuns
-        console.log("Usuário é um administrador comum. Retornando 3."); // Log para controle
+        // NOVIDADE: Se for veterinário -> Tipo 4
+        if (adminEntry.ds_perfil === 'veterinario') {
+          console.log("Identificado como Veterinário. Retornando 4.");
+          return res.send(JSON.stringify(4));
+        }
+
+        // Se for admin comum -> Tipo 3
         return res.send(JSON.stringify(3));
       } else {
-        // Retorna 1 para usuários comuns
-        console.log("Usuário é comum. Retornando 1."); // Log para controle
+        // 4. Se não estiver na tabela de admins, é um Tutor comum -> Tipo 1
         return res.send(JSON.stringify(1));
       }
     } else {
-      console.log("Usuário não encontrado para o CPF:", nu_cpf); // Log para controle
+      console.log("CPF não cadastrado.");
       res.send(false);
     }
   } catch (error) {
-    console.log("Erro em /usuarioLoginIntegrado!");
-    console.log(error.message);
-    res.status(500).send("Erro interno do servidor"); // Resposta em caso de erro
+    console.log("Erro em /usuarioLoginIntegrado!", error.message);
+    res.status(500).send("Erro interno");
   }
 });
-
 
 route.post("/checkUsuarioCPF", async (req, res) => {
   try {
@@ -531,6 +530,23 @@ route.post("/usuarioLoginGoogle", async (req, res) => {
     console.log("Erro em /usuarioLoginGoogle!");
     console.log(error.message);
     res.status(500).send("Erro interno do servidor");
+  }
+});
+
+route.get("/veterinarios/:id/animais", async (req, res) => {
+  try {
+    const { id } = req.params; // ID que vem do Frontend (ex: 8)
+
+    // Buscamos os animais onde o mob_veterinarios_id seja igual ao ID que o Frontend mandou
+    // Nota: Se no banco o vínculo for diferente do ID de usuário, 
+    // precisamos primeiro achar o ID do vet associado ao ID do usuário.
+    const pacientes = await models.mob_animais.findAll({
+      where: { mob_tutores_id: id } // Ou mob_veterinarios_id dependendo do vínculo no seu SQL[cite: 1]
+    });
+    
+    res.send(pacientes);
+  } catch (error) {
+    res.status(500).send("Erro ao buscar pacientes");
   }
 });
 
