@@ -178,58 +178,36 @@ route.post("/usuarioLogin", async (req, res) => {
 route.post("/usuarioLoginIntegrado", async (req, res) => {
   try {
     const { nu_cpf, ds_senha } = req.body;
-    console.log("Tentativa de login integrado com CPF:", nu_cpf);
-
-    // 1. Busca o usuário na tabela principal (onde estão todos os CPFs)
     const user = await usuarios.findOne({ where: { nu_cpf } });
 
     if (user) {
-      console.log("Usuário encontrado:", user.id);
-
-      // 2. Validação de senha (Bcrypt ou Texto Simples)
       let isMatch;
+      // Trata a senha vinda do App vs Banco (Hash ou Texto Simples)[cite: 1]
       if (user.ds_senha.startsWith('$2b$')) {
         isMatch = await bcrypt.compare(ds_senha, user.ds_senha);
       } else {
         isMatch = ds_senha === user.ds_senha;
       }
 
-      if (!isMatch) {
-        console.log("Senha incorreta.");
-        return res.send(false);
-      }
+      if (!isMatch) return res.send(false);
 
-      // 3. Verifica se o usuário tem um perfil na tabela de administradores
       const adminEntry = await administradores.findOne({
         where: { mob_usuarios_id: user.id },
       });
 
-      console.log("Perfil administrativo encontrado:", adminEntry ? adminEntry.ds_perfil : "Nenhum");
-
       if (adminEntry) {
-        // Se for parceiro -> Tipo 2
-        if (adminEntry.ds_perfil === 'parceiro') {
-          return res.send(JSON.stringify(2));
-        }
-
-        // NOVIDADE: Se for veterinário -> Tipo 4
-        if (adminEntry.ds_perfil === 'veterinario') {
-          console.log("Identificado como Veterinário. Retornando 4.");
-          return res.send(JSON.stringify(4));
-        }
-
-        // Se for admin comum -> Tipo 3
-        return res.send(JSON.stringify(3));
-      } else {
-        // 4. Se não estiver na tabela de admins, é um Tutor comum -> Tipo 1
-        return res.send(JSON.stringify(1));
+        if (adminEntry.ds_perfil === 'parceiro') return res.send(JSON.stringify(2));
+        
+        // Retorna 4 apenas se o perfil for EXATAMENTE 'veterinario'
+        if (adminEntry.ds_perfil === 'veterinario') return res.send(JSON.stringify(4));
+        
+        return res.send(JSON.stringify(3)); // Admin
       }
+      return res.send(JSON.stringify(1)); // Tutor
     } else {
-      console.log("CPF não cadastrado.");
       res.send(false);
     }
   } catch (error) {
-    console.log("Erro em /usuarioLoginIntegrado!", error.message);
     res.status(500).send("Erro interno");
   }
 });
