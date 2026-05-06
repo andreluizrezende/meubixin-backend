@@ -12,11 +12,11 @@ const { OAuth2Client } = require('google-auth-library');
 // Configurar o Google OAuth client
 const client = new OAuth2Client('867699850241-is78nhfgn1blt5ji6ag9tfpdcn0cuspb.apps.googleusercontent.com');
 
-const {
-  generateSecureToken,
-  hashToken,
-  verifyToken,
-  getExpirationDate,
+const { 
+  generateSecureToken, 
+  hashToken, 
+  verifyToken, 
+  getExpirationDate, 
   validateTokenRecord,
   parseUserAgent,
   checkRateLimit,
@@ -32,17 +32,17 @@ const axios = require('axios');
 route.post('/web-veterinarios/validar-crmv', async (req, res) => {
   try {
     const { nu_crmv, ds_estado_crmv } = req.body;
-
+    
     console.log(`Validando CRMV: ${nu_crmv} - Estado: ${ds_estado_crmv}`);
-
+    
     // Busca na tabela mob_veterinarios se existe o CRMV + Estado
     const mobVeterinario = await mob_veterinarios.findOne({
-      where: {
+      where: { 
         nu_crmv,
-        ds_estado_crmv
+        ds_estado_crmv 
       }
     });
-
+    
     if (!mobVeterinario) {
       console.log("CRMV não encontrado na base de dados mobile");
       return res.status(404).json({
@@ -50,14 +50,14 @@ route.post('/web-veterinarios/validar-crmv', async (req, res) => {
         message: "CRMV não encontrado em nossa base de dados. Não é possível realizar o cadastro nesta plataforma."
       });
     }
-
+    
     console.log("CRMV encontrado! Retornando dados para pré-preenchimento");
-
+    
     // Verifica se já existe um cadastro web para este veterinário
     const webVeterinarioExistente = await web_veterinarios.findOne({
       where: { mob_veterinarios_id: mobVeterinario.id }
     });
-
+    
     if (webVeterinarioExistente) {
       return res.status(409).json({
         success: false,
@@ -65,7 +65,7 @@ route.post('/web-veterinarios/validar-crmv', async (req, res) => {
         veterinario_existente: true
       });
     }
-
+    
     // Retorna os dados para pré-preenchimento do formulário
     res.json({
       success: true,
@@ -79,7 +79,7 @@ route.post('/web-veterinarios/validar-crmv', async (req, res) => {
         mob_veterinarios_id: mobVeterinario.id
       }
     });
-
+    
   } catch (error) {
     console.log('ERRO em /web-veterinarios/validar-crmv');
     console.log(error.message);
@@ -89,8 +89,6 @@ route.post('/web-veterinarios/validar-crmv', async (req, res) => {
     });
   }
 });
-
-    // rota para buscar os animais do veterinário usando o CPF como referência no sistema mobile, já que o cadastro web é vinculado ao mobile 
 
 // ============= ROTAS ATUALIZADAS PARA WEB_VETERINARIOS =============
 
@@ -113,13 +111,13 @@ route.post('/web-veterinarios/login/google', async (req, res) => {
     console.log("Token Google válido. Google ID:", googleId, "Email:", email);
 
     // Busca o veterinário pelo Google ID
-    const veterinario = await web_veterinarios.findOne({
-      where: { google_id: googleId }
+    const veterinario = await web_veterinarios.findOne({ 
+      where: { google_id: googleId } 
     });
-
+    
     if (!veterinario) {
       console.log("Veterinário não encontrado para o Google ID:", googleId);
-
+      
       // NOVA LÓGICA: Retorna 200 com código específico
       return res.status(200).json({
         success: false,
@@ -135,10 +133,10 @@ route.post('/web-veterinarios/login/google', async (req, res) => {
     }
 
     console.log("Veterinário web autenticado com Google com sucesso!");
-
+    
     // Retorna os dados do veterinário
     const { ds_senha: _, ...veterinarioResponse } = veterinario.toJSON();
-
+    
     res.status(200).json({
       success: true,
       message: "Login com Google realizado com sucesso!",
@@ -172,9 +170,9 @@ route.post('/web-veterinarios/link-google', async (req, res) => {
     // Verificar se usuário existe
     const user = await web_veterinarios.findByPk(userId);
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Usuário não encontrado'
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Usuário não encontrado' 
       });
     }
 
@@ -182,17 +180,17 @@ route.post('/web-veterinarios/link-google', async (req, res) => {
     const existingGoogle = await web_veterinarios.findOne({
       where: { google_id: googleId }
     });
-
+    
     if (existingGoogle && existingGoogle.id !== parseInt(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Esta conta Google já está vinculada a outro usuário'
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Esta conta Google já está vinculada a outro usuário' 
       });
     }
 
     // Vincular conta Google
     await web_veterinarios.update(
-      {
+      { 
         google_id: googleId,
         // Opcionalmente atualizar email se diferente
         ...(user.ds_email !== googleEmail && { ds_email: googleEmail })
@@ -201,17 +199,17 @@ route.post('/web-veterinarios/link-google', async (req, res) => {
     );
 
     console.log("Conta Google vinculada com sucesso!");
-
-    res.json({
-      success: true,
-      message: 'Conta Google vinculada com sucesso'
+    
+    res.json({ 
+      success: true, 
+      message: 'Conta Google vinculada com sucesso' 
     });
 
   } catch (error) {
     console.error('Erro ao vincular Google:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro interno do servidor'
+    res.status(500).json({ 
+      success: false, 
+      message: 'Erro interno do servidor' 
     });
   }
 });
@@ -220,11 +218,11 @@ route.post('/web-veterinarios/link-google', async (req, res) => {
 route.post('/web-veterinarios/login', async (req, res) => {
   try {
     const { email, password, ds_email, ds_senha } = req.body;
-
+    
     // Aceita tanto o formato novo quanto o antigo
     const emailToUse = email || ds_email;
     const passwordToUse = password || ds_senha;
-
+    
     console.log("Tentativa de login web veterinário com email:", emailToUse);
 
     if (!emailToUse || !passwordToUse) {
@@ -235,10 +233,10 @@ route.post('/web-veterinarios/login', async (req, res) => {
     }
 
     // Busca o veterinário pelo email
-    const veterinario = await web_veterinarios.findOne({
-      where: { ds_email: emailToUse }
+    const veterinario = await web_veterinarios.findOne({ 
+      where: { ds_email: emailToUse } 
     });
-
+    
     if (!veterinario) {
       console.log("Veterinário não encontrado para o email:", emailToUse);
       return res.status(401).json({
@@ -269,10 +267,10 @@ route.post('/web-veterinarios/login', async (req, res) => {
     }
 
     console.log("Veterinário web autenticado com sucesso!");
-
+    
     // Retorna os dados do veterinário (sem a senha)
     const { ds_senha: _, ...veterinarioResponse } = veterinario.toJSON();
-
+    
     res.json({
       success: true,
       message: "Login realizado com sucesso!",
@@ -293,27 +291,27 @@ route.post('/web-veterinarios/login', async (req, res) => {
 // NOVA ROTA: Criar conta com dados do Google (para novos usuários)
 route.post('/web-veterinarios/cadastro', async (req, res) => {
   try {
-    const {
+    const { 
       // Dados obrigatórios do CRMV (já validados)
       mob_veterinarios_id,
       nu_crmv,
       ds_estado_crmv,
-
+      
       // Dados pessoais
       no_completo,
       ds_email,
       nu_cpf,
       nu_telefone_completo,
       ds_logo_s3_path,
-
+      
       // Autenticação - pode ser senha OU Google
       ds_senha,
-
+      
       // Dados do Google (opcionais)
       googleToken,
       google_id
     } = req.body;
-
+    
     console.log("🚀 Iniciando cadastro web veterinário unificado");
     console.log("📋 Dados recebidos:", {
       hasGoogleToken: !!googleToken,
@@ -324,7 +322,7 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
     });
 
     // ========== VALIDAÇÕES BÁSICAS ==========
-
+    
     // Verificar se tem CRMV validado
     if (!mob_veterinarios_id || !nu_crmv || !ds_estado_crmv) {
       return res.status(400).json({
@@ -350,14 +348,14 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
     }
 
     // ========== PROCESSAMENTO DO GOOGLE (se fornecido) ==========
-
+    
     let googleData = null;
     let finalGoogleId = google_id; // Pode vir direto ou do token
-
+    
     if (googleToken) {
       try {
         console.log("🔍 Validando token Google...");
-
+        
         const ticket = await client.verifyIdToken({
           idToken: googleToken,
           audience: '867699850241-is78nhfgn1blt5ji6ag9tfpdcn0cuspb.apps.googleusercontent.com',
@@ -370,11 +368,11 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
           name: payload['name'],
           picture: payload['picture']
         };
-
+        
         finalGoogleId = payload['sub']; // Usar Google ID do token
-
+        
         console.log("✅ Token Google válido:", googleData.google_id);
-
+        
         // Verificar se o email do Google confere com o fornecido
         if (googleData.email !== ds_email) {
           return res.status(400).json({
@@ -382,7 +380,7 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
             message: "Email do Google não confere com o email fornecido."
           });
         }
-
+        
       } catch (error) {
         console.error("❌ Erro ao validar token Google:", error.message);
         return res.status(400).json({
@@ -393,12 +391,12 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
     }
 
     // ========== VERIFICAÇÕES DE DUPLICAÇÃO ==========
-
+    
     // Verificar se email já existe
     const emailExistente = await web_veterinarios.findOne({
       where: { ds_email }
     });
-
+    
     if (emailExistente) {
       return res.status(409).json({
         success: false,
@@ -411,7 +409,7 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
       const googleIdExistente = await web_veterinarios.findOne({
         where: { google_id: finalGoogleId }
       });
-
+      
       if (googleIdExistente) {
         return res.status(409).json({
           success: false,
@@ -424,7 +422,7 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
     const webVeterinarioExistente = await web_veterinarios.findOne({
       where: { mob_veterinarios_id }
     });
-
+    
     if (webVeterinarioExistente) {
       return res.status(409).json({
         success: false,
@@ -433,7 +431,7 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
     }
 
     // ========== PREPARAÇÃO DOS DADOS ==========
-
+    
     // Hash da senha (se fornecida)
     let senhaHash = null;
     if (ds_senha) {
@@ -453,7 +451,7 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
       nu_cpf: nu_cpf || null,
       nu_telefone_completo: nu_telefone_completo || null,
       ds_logo_s3: ds_logo_s3_path || null,
-      ds_assinatura_s3: ds_logo_s3_path || null
+      ds_assinatura_s3:  ds_logo_s3_path || null
     };
 
     console.log("💾 Criando veterinário com dados:", {
@@ -462,20 +460,20 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
     });
 
     // ========== CRIAÇÃO DO REGISTRO ==========
-
+    
     const novoWebVeterinario = await web_veterinarios.create(dadosCriacao);
-
+    
     console.log("✅ Web veterinário criado com sucesso! ID:", novoWebVeterinario.id);
-
+    
     // ========== RESPOSTA ==========
-
+    
     // Retornar dados do usuário criado (sem a senha)
     const { ds_senha: _, ...veterinarioResponse } = novoWebVeterinario.toJSON();
-
+    
     const response = {
       success: true,
-      message: googleData
-        ? "Conta criada com sucesso usando Google!"
+      message: googleData 
+        ? "Conta criada com sucesso usando Google!" 
         : "Conta criada com sucesso!",
       token: `jwt_token_here_${novoWebVeterinario.id}`, // Substitua por seu JWT real
       veterinario: veterinarioResponse,
@@ -495,7 +493,7 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
   } catch (error) {
     console.error('❌ ERRO em /web-veterinarios/cadastro:', error.message);
     console.error('Stack:', error.stack);
-
+    
     res.status(500).json({
       success: false,
       message: "Erro interno do servidor"
@@ -507,7 +505,7 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
 route.post('/web-veterinarios/check-email', async (req, res) => {
   try {
     const { email } = req.body;
-
+    
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -522,8 +520,8 @@ route.post('/web-veterinarios/check-email', async (req, res) => {
     res.json({
       success: true,
       available: !veterinarioExistente,
-      message: veterinarioExistente
-        ? "Email já está em uso"
+      message: veterinarioExistente 
+        ? "Email já está em uso" 
         : "Email disponível"
     });
 
@@ -541,7 +539,7 @@ route.post('/web-veterinarios/check-email', async (req, res) => {
 route.post('/web-veterinarios/find-by-email', async (req, res) => {
   try {
     const { email } = req.body;
-
+    
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -601,14 +599,14 @@ route.get('/web-veterinarios/:id', async (req, res) => {
     const resposta = await web_veterinarios.findByPk(id, {
       attributes: { exclude: ['ds_senha'] }
     });
-
+    
     if (!resposta) {
       return res.status(404).json({
         success: false,
         message: "Veterinário não encontrado"
       });
     }
-
+    
     res.json(resposta);
   } catch (error) {
     console.log('ERRO em /web-veterinarios/:id');
@@ -624,7 +622,7 @@ route.put('/web-veterinarios/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { ds_senha, google_id, created_at, updated_at, ...dadosAtualizacao } = req.body;
-
+    
     // Validar se veterinário existe
     const veterinarioExistente = await web_veterinarios.findByPk(id);
     if (!veterinarioExistente) {
@@ -633,26 +631,26 @@ route.put('/web-veterinarios/:id', async (req, res) => {
         message: "Veterinário não encontrado"
       });
     }
-
+    
     // Se foi enviada uma nova senha, faz o hash
     if (ds_senha) {
       dadosAtualizacao.ds_senha = await bcrypt.hash(ds_senha, 10);
     }
-
+    
     // Atualizar dados
     await web_veterinarios.update(dadosAtualizacao, { where: { id } });
-
+    
     // ✅ Buscar dados atualizados para retornar
     const veterinarioAtualizado = await web_veterinarios.findByPk(id, {
       attributes: { exclude: ['ds_senha'] }
     });
-
+    
     res.json({
       success: true,
       message: "Veterinário atualizado com sucesso!",
       veterinario: veterinarioAtualizado // 🎯 Frontend precisa!
     });
-
+    
   } catch (error) {
     console.log('ERRO em /web-veterinarios/:id PUT');
     console.log(error);
@@ -666,168 +664,168 @@ route.put('/web-veterinarios/:id', async (req, res) => {
 
 // Rota para upload de imagens do veterinário (logo e assinatura)
 route.put('/web-veterinarios/:id/upload-image', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { tipo, imagem_base64, remover = false } = req.body;
+ try {
+   const { id } = req.params;
+   const { tipo, imagem_base64, remover = false } = req.body;
 
-    // ✅ ADICIONAR LOG PARA DEBUG
-    console.log('📥 Parâmetros recebidos:', {
-      tipo,
-      remover,
-      tem_imagem: !!imagem_base64,
-      tamanho_imagem: imagem_base64?.length || 0
-    });
+   // ✅ ADICIONAR LOG PARA DEBUG
+   console.log('📥 Parâmetros recebidos:', { 
+     tipo, 
+     remover, 
+     tem_imagem: !!imagem_base64,
+     tamanho_imagem: imagem_base64?.length || 0 
+   });
 
-    // Validar parâmetros obrigatórios
-    if (!tipo || !['logo', 'assinatura'].includes(tipo)) {
-      return res.status(400).json({
-        success: false,
-        message: "Tipo deve ser 'logo' ou 'assinatura'"
-      });
-    }
+   // Validar parâmetros obrigatórios
+   if (!tipo || !['logo', 'assinatura'].includes(tipo)) {
+     return res.status(400).json({
+       success: false,
+       message: "Tipo deve ser 'logo' ou 'assinatura'"
+     });
+   }
 
-    // ✅ CORRIGIR VALIDAÇÃO: Se não é remoção, validar se tem imagem
-    if (remover !== true && !imagem_base64) {
-      console.log('❌ Falha na validação - remover:', remover, 'tem_imagem:', !!imagem_base64);
-      return res.status(400).json({
-        success: false,
-        message: "Imagem é obrigatória ou use 'remover: true'"
-      });
-    }
+   // ✅ CORRIGIR VALIDAÇÃO: Se não é remoção, validar se tem imagem
+   if (remover !== true && !imagem_base64) {
+     console.log('❌ Falha na validação - remover:', remover, 'tem_imagem:', !!imagem_base64);
+     return res.status(400).json({
+       success: false,
+       message: "Imagem é obrigatória ou use 'remover: true'"
+     });
+   }
 
-    // Buscar dados do veterinário para gerar key única
-    const veterinario = await web_veterinarios.findByPk(id);
-    if (!veterinario) {
-      return res.status(404).json({
-        success: false,
-        message: "Veterinário não encontrado"
-      });
-    }
+   // Buscar dados do veterinário para gerar key única
+   const veterinario = await web_veterinarios.findByPk(id);
+   if (!veterinario) {
+     return res.status(404).json({
+       success: false,
+       message: "Veterinário não encontrado"
+     });
+   }
 
-    // Gerar key única: veterinarios/12345_SP_logo ou veterinarios/12345_SP_assinatura
-    const key = `${veterinario.nu_crmv}_${veterinario.ds_estado_crmv}_${tipo}`;
-    const filePath = `veterinarios/${key}`;
+   // Gerar key única: veterinarios/12345_SP_logo ou veterinarios/12345_SP_assinatura
+   const key = `${veterinario.nu_crmv}_${veterinario.ds_estado_crmv}_${tipo}`;
+   const filePath = `veterinarios/${key}`;
 
-    // Verificar se já existe imagem no S3
-    const fileStream = await getFileStream(filePath);
-    const imageExists = fileStream !== undefined;
+   // Verificar se já existe imagem no S3
+   const fileStream = await getFileStream(filePath);
+   const imageExists = fileStream !== undefined;
 
-    // Campo do banco correspondente
-    const updateField = tipo === 'logo' ? 'ds_logo_s3' : 'ds_assinatura_s3';
+   // Campo do banco correspondente
+   const updateField = tipo === 'logo' ? 'ds_logo_s3' : 'ds_assinatura_s3';
 
-    // ✅ CASO 1: REMOÇÃO DA IMAGEM
-    if (remover === true) {
-      console.log(`🗑️ Removendo ${tipo} do veterinário ${veterinario.no_completo}...`);
+   // ✅ CASO 1: REMOÇÃO DA IMAGEM
+   if (remover === true) {
+     console.log(`🗑️ Removendo ${tipo} do veterinário ${veterinario.no_completo}...`);
+     
+     // Se existe no S3, excluir
+     if (imageExists) {
+       await deleteFile(filePath);
+       console.log(`✅ Imagem ${tipo} excluída do S3 com sucesso!`);
+     } else {
+       console.log(`ℹ️ Imagem ${tipo} não existe no S3, apenas limpando banco...`);
+     }
 
-      // Se existe no S3, excluir
-      if (imageExists) {
-        await deleteFile(filePath);
-        console.log(`✅ Imagem ${tipo} excluída do S3 com sucesso!`);
-      } else {
-        console.log(`ℹ️ Imagem ${tipo} não existe no S3, apenas limpando banco...`);
-      }
+     // Limpar campo no banco (definir como null)
+     await web_veterinarios.update(
+       { [updateField]: null },
+       { where: { id } }
+     );
 
-      // Limpar campo no banco (definir como null)
-      await web_veterinarios.update(
-        { [updateField]: null },
-        { where: { id } }
-      );
+     console.log(`✅ Campo ${updateField} limpo no banco com sucesso!`);
 
-      console.log(`✅ Campo ${updateField} limpo no banco com sucesso!`);
+     return res.json({
+       success: true,
+       message: `${tipo === 'logo' ? 'Logo' : 'Assinatura'} removida com sucesso!`
+     });
+   }
 
-      return res.json({
-        success: true,
-        message: `${tipo === 'logo' ? 'Logo' : 'Assinatura'} removida com sucesso!`
-      });
-    }
+   // ✅ CASO 2: UPLOAD DE NOVA IMAGEM
+   console.log(`📤 Realizando upload da nova imagem ${tipo}...`);
 
-    // ✅ CASO 2: UPLOAD DE NOVA IMAGEM
-    console.log(`📤 Realizando upload da nova imagem ${tipo}...`);
+   // Se existe imagem antiga, excluir primeiro
+   if (imageExists) {
+     console.log(`🔄 Imagem ${tipo} existente encontrada. Excluindo...`);
+     await deleteFile(filePath);
+     console.log(`✅ Imagem anterior excluída com sucesso!`);
+   }
 
-    // Se existe imagem antiga, excluir primeiro
-    if (imageExists) {
-      console.log(`🔄 Imagem ${tipo} existente encontrada. Excluindo...`);
-      await deleteFile(filePath);
-      console.log(`✅ Imagem anterior excluída com sucesso!`);
-    }
+   // Criar arquivo temporário com a imagem base64
+   const tempFilePath = path.resolve(__dirname, `temp_${Date.now()}.png`);
+   
+   fs.writeFileSync(
+     tempFilePath,
+     imagem_base64.replace(/^data:image\/\w+;base64,/, ""), // Remove prefixo se existir
+     "base64"
+   );
 
-    // Criar arquivo temporário com a imagem base64
-    const tempFilePath = path.resolve(__dirname, `temp_${Date.now()}.png`);
+   // Criar stream de leitura do arquivo
+   const fileStreamUpload = fs.createReadStream(tempFilePath);
 
-    fs.writeFileSync(
-      tempFilePath,
-      imagem_base64.replace(/^data:image\/\w+;base64,/, ""), // Remove prefixo se existir
-      "base64"
-    );
+   // Upload para S3
+   await uploadFile(fileStreamUpload, filePath);
 
-    // Criar stream de leitura do arquivo
-    const fileStreamUpload = fs.createReadStream(tempFilePath);
+   // Remover arquivo temporário
+   fs.unlinkSync(tempFilePath);
 
-    // Upload para S3
-    await uploadFile(fileStreamUpload, filePath);
+   // Atualizar campo correspondente no banco
+   await web_veterinarios.update(
+     { [updateField]: filePath },
+     { where: { id } }
+   );
 
-    // Remover arquivo temporário
-    fs.unlinkSync(tempFilePath);
+   console.log(`✅ Upload de ${tipo} concluído com sucesso!`);
 
-    // Atualizar campo correspondente no banco
-    await web_veterinarios.update(
-      { [updateField]: filePath },
-      { where: { id } }
-    );
+   res.json({
+     success: true,
+     message: `${tipo === 'logo' ? 'Logo' : 'Assinatura'} atualizada com sucesso!`
+   });
 
-    console.log(`✅ Upload de ${tipo} concluído com sucesso!`);
-
-    res.json({
-      success: true,
-      message: `${tipo === 'logo' ? 'Logo' : 'Assinatura'} atualizada com sucesso!`
-    });
-
-  } catch (error) {
-    console.log('❌ ERRO em /web-veterinarios/:id/upload-image');
-    console.log(error.message);
-    res.status(500).json({
-      success: false,
-      message: "Erro interno do servidor"
-    });
-  }
+ } catch (error) {
+   console.log('❌ ERRO em /web-veterinarios/:id/upload-image');
+   console.log(error.message);
+   res.status(500).json({
+     success: false,
+     message: "Erro interno do servidor"
+   });
+ }
 });
 
 route.get('/web-veterinarios/:id/imagem/:tipo', async (req, res) => {
   try {
     const { id, tipo } = req.params;
-
+    
     // Validar tipo
     if (!tipo || !['logo', 'assinatura'].includes(tipo)) {
       return res.status(400).json({
         error: "Tipo deve ser 'logo' ou 'assinatura'"
       });
     }
-
+    
     // Buscar dados do veterinário para gerar a key correta
     const veterinario = await web_veterinarios.findByPk(id);
-
+    
     if (!veterinario) {
       return res.status(404).json({ error: 'Veterinário não encontrado' });
     }
-
+    
     // Gerar a key da imagem
     const key = `${veterinario.nu_crmv}_${veterinario.ds_estado_crmv}_${tipo}`;
     const filePath = `veterinarios/${key}`;
-
+    
     // Verificar se a imagem existe no S3 usando getFileStream
     const fileStream = await getFileStream(filePath);
     const imageExists = fileStream !== undefined;
-
+    
     if (!imageExists) {
       return res.status(404).json({ error: `${tipo === 'logo' ? 'Logo' : 'Assinatura'} não encontrada` });
     }
-
+    
     // Definir headers apropriados
     res.set({
       'Content-Type': 'image/png', // ou image/jpeg, dependendo do formato
       'Cache-Control': 'no-store, max-age=0' // Cache por 1 hora
     });
-
+    
     // Stream da imagem para o cliente
     if (fileStream.pipe) {
       fileStream.pipe(res);
@@ -840,7 +838,7 @@ route.get('/web-veterinarios/:id/imagem/:tipo', async (req, res) => {
       const buffer = Buffer.concat(chunks);
       res.send(buffer);
     }
-
+    
   } catch (error) {
     console.log('ERRO em /web-veterinarios/:id/imagem/:tipo');
     console.log(error.message);
@@ -853,14 +851,14 @@ route.delete('/web-veterinarios/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const rowsAffected = await web_veterinarios.destroy({ where: { id } });
-
+    
     if (rowsAffected === 0) {
       return res.status(404).json({
         success: false,
         message: "Veterinário não encontrado"
       });
     }
-
+    
     res.json({
       success: true,
       message: "Veterinário deletado com sucesso!"
@@ -912,15 +910,15 @@ route.get('/veterinarios/:id/animais', async (req, res) => {
 });
 
 route.get('/veterinarios/details/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const resposta = await mob_veterinarios.findAll({ where: { id } });
-    resposta ? res.send(resposta) : res.send(false);
-  } catch (error) {
-    console.log('ERRO em /veterinarios');
-    console.log(error.message);
-  }
-});
+    try {
+      const { id } = req.params;
+      const resposta = await mob_veterinarios.findAll({ where: { id } });
+      resposta ? res.send(resposta) : res.send(false);
+    } catch (error) {
+      console.log('ERRO em /veterinarios');
+      console.log(error.message);
+    }
+  });
 
 // Rota para criar um novo veterinário mobile
 route.post('/veterinarios', async (req, res) => {
@@ -977,7 +975,7 @@ route.post('/web-veterinarios/:id/change-password', async (req, res) => {
     console.log(`🔐 Tentativa de alteração de senha para veterinário ${id}`)
 
     // ========== VALIDAÇÕES BÁSICAS ==========
-
+    
     if (!nova_senha || !confirmar_senha) {
       return res.status(400).json({
         success: false,
@@ -1003,9 +1001,9 @@ route.post('/web-veterinarios/:id/change-password', async (req, res) => {
     }
 
     // ========== BUSCAR VETERINÁRIO ==========
-
+    
     const veterinario = await web_veterinarios.findByPk(id)
-
+    
     if (!veterinario) {
       return res.status(404).json({
         success: false,
@@ -1015,9 +1013,9 @@ route.post('/web-veterinarios/:id/change-password', async (req, res) => {
     }
 
     // ========== VALIDAR SENHA ATUAL (se já tiver senha definida) ==========
-
+    
     const jaTemSenha = veterinario.ds_senha && veterinario.ds_senha.trim() !== ''
-
+    
     if (jaTemSenha) {
       // Se já tem senha, deve informar a senha atual
       if (!senha_atual) {
@@ -1030,7 +1028,7 @@ route.post('/web-veterinarios/:id/change-password', async (req, res) => {
 
       // Verificar se a senha atual está correta
       const senhaAtualCorreta = await bcrypt.compare(senha_atual, veterinario.ds_senha)
-
+      
       if (!senhaAtualCorreta) {
         console.log(`❌ Senha atual incorreta para veterinário ${id}`)
         return res.status(401).json({
@@ -1045,10 +1043,10 @@ route.post('/web-veterinarios/:id/change-password', async (req, res) => {
     }
 
     // ========== VERIFICAR SE NOVA SENHA É DIFERENTE DA ATUAL ==========
-
+    
     if (jaTemSenha) {
       const novaSenhaIgualAtual = await bcrypt.compare(nova_senha, veterinario.ds_senha)
-
+      
       if (novaSenhaIgualAtual) {
         return res.status(400).json({
           success: false,
@@ -1059,12 +1057,12 @@ route.post('/web-veterinarios/:id/change-password', async (req, res) => {
     }
 
     // ========== GERAR HASH DA NOVA SENHA ==========
-
+    
     console.log(`🔐 Gerando hash da nova senha para veterinário ${id}`)
     const novaSenhaHash = await bcrypt.hash(nova_senha, 10)
 
     // ========== ATUALIZAR SENHA NO BANCO ==========
-
+    
     await web_veterinarios.update(
       { ds_senha: novaSenhaHash },
       { where: { id } }
@@ -1073,7 +1071,7 @@ route.post('/web-veterinarios/:id/change-password', async (req, res) => {
     console.log(`✅ Senha alterada com sucesso para veterinário ${id}`)
 
     // ========== RESPOSTA DE SUCESSO ==========
-
+    
     res.json({
       success: true,
       message: jaTemSenha ? "Senha alterada com sucesso!" : "Senha definida com sucesso!",
@@ -1083,7 +1081,7 @@ route.post('/web-veterinarios/:id/change-password', async (req, res) => {
   } catch (error) {
     console.error('❌ ERRO em /web-veterinarios/:id/change-password:', error.message)
     console.error('Stack:', error.stack)
-
+    
     res.status(500).json({
       success: false,
       message: "Erro interno do servidor",
@@ -1104,11 +1102,11 @@ route.get('/web-veterinarios/:id/security-status', async (req, res) => {
     console.log(`🔍 Buscando status de segurança para veterinário ${id}`)
 
     // ========== BUSCAR VETERINÁRIO ==========
-
+    
     const veterinario = await web_veterinarios.findByPk(id, {
       attributes: ['id', 'google_id', 'ds_senha', 'updatedAt', 'createdAt']
     })
-
+    
     if (!veterinario) {
       return res.status(404).json({
         success: false,
@@ -1118,10 +1116,10 @@ route.get('/web-veterinarios/:id/security-status', async (req, res) => {
     }
 
     // ========== CALCULAR STATUS DE SEGURANÇA ==========
-
+    
     const hasPassword = !!(veterinario.ds_senha && veterinario.ds_senha.trim() !== '')
     const hasGoogle = !!(veterinario.google_id && veterinario.google_id.trim() !== '')
-
+    
     // Calcular data da última atualização da senha (aproximada)
     let passwordSetDate = null
     if (hasPassword) {
@@ -1132,10 +1130,10 @@ route.get('/web-veterinarios/:id/security-status', async (req, res) => {
     // Determinar nível de segurança
     let securityLevel = 'low'
     let securityScore = 0
-
+    
     if (hasPassword) securityScore += 50
     if (hasGoogle) securityScore += 50
-
+    
     if (securityScore >= 100) {
       securityLevel = 'high' // Tem senha E Google
     } else if (securityScore >= 50) {
@@ -1145,7 +1143,7 @@ route.get('/web-veterinarios/:id/security-status', async (req, res) => {
     }
 
     // ========== MONTAR RESPOSTA ==========
-
+    
     const securityStatus = {
       has_password: hasPassword,
       has_google: hasGoogle,
@@ -1187,7 +1185,7 @@ route.get('/web-veterinarios/:id/security-status', async (req, res) => {
     })
 
     // ========== RESPOSTA DE SUCESSO ==========
-
+    
     res.json({
       success: true,
       message: "Status de segurança obtido com sucesso",
@@ -1197,7 +1195,7 @@ route.get('/web-veterinarios/:id/security-status', async (req, res) => {
   } catch (error) {
     console.error('❌ ERRO em /web-veterinarios/:id/security-status:', error.message)
     console.error('Stack:', error.stack)
-
+    
     res.status(500).json({
       success: false,
       message: "Erro interno do servidor",
