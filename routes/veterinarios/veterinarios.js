@@ -1204,32 +1204,45 @@ route.get('/web-veterinarios/:id/security-status', async (req, res) => {
   }
 })
 
-// ========= ROTA PROCURAR OS ANIMAIS ASSOCIADOS AO VETERINARIO NO APP - VISÃO DO VETERINARIO =========
+// ========= ROTA BUSCAR ANIMAIS (PADRÃO SEQUELIZE - ADICIONE ANTES DAS ROTAS COM :id) =========
 
 route.get('/veterinarios/meus-animais/:nu_cpf', async (req, res) => {
   const { nu_cpf } = req.params;
 
   try {
-    // A mágica acontece aqui: Um único SELECT que liga as 3 tabelas
-    const query = `
-      SELECT a.* FROM mob_animais a
-      JOIN mob_veterinarios mv ON a.mob_veterinarios_id = mv.id
-      JOIN web_veterinarios wv ON mv.nu_crmv = wv.nu_crmv AND mv.ds_estado_crmv = wv.ds_estado_crmv
-      WHERE wv.nu_cpf = :nu_cpf
-    `;
-
-    // Usando o padrão Sequelize exato que já existe no seu arquivo
-    const animais = await sequelize.query(query, {
-      replacements: { nu_cpf },
-      type: sequelize.QueryTypes.SELECT
+    // 1. Busca o veterinário na WEB pelo CPF
+    const vetWeb = await web_veterinarios.findOne({
+      where: { nu_cpf: nu_cpf }
     });
 
-    // Devolvemos a lista de animais diretamente
-    res.json(animais);
+    if (!vetWeb) {
+      return res.status(404).json({ message: "Veterinário não encontrado na base Web." });
+    }
+
+    // 2. Busca o vínculo no Mobile usando CRMV e UF
+    const vetMob = await mob_veterinarios.findOne({
+      where: { 
+        nu_crmv: vetWeb.nu_crmv, 
+        ds_estado_crmv: vetWeb.ds_estado_crmv 
+      }
+    });
+
+    if (!vetMob) {
+      return res.status(404).json({ message: "Vínculo profissional não localizado no mobile." });
+    }
+
+    // 3. Busca a lista final de animais
+    const listaAnimais = await mob_animais.findAll({
+      where: { mob_veterinarios_id: vetMob.id },
+      order: [['no_nome', 'ASC']]
+    });
+
+    res.json(listaAnimais);
+
   } catch (error) {
-    console.error("Erro ao procurar animais por CPF:", error);
-    res.status(500).json({ error: "Erro interno no servidor" });
+    console.log('ERRO em /veterinarios/meus-animais/:nu_cpf:', error.message);
+    res.status(500).json({ error: 'Erro interno no servidor' });
   }
-})
+});
 
 module.exports = route;
