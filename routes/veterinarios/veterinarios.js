@@ -1206,7 +1206,7 @@ route.get('/web-veterinarios/:id/security-status', async (req, res) => {
 
 // ========= ROTA BUSCAR ANIMAIS (PADRÃO SEQUELIZE - ADICIONE ANTES DAS ROTAS COM :id) =========
 
-route.get('/veterinarios/meus-animais/:nu_cpf', async (req, res) => {
+route.get('/consulta-animais-vet-mob/:nu_cpf', async (req, res) => {
   const { nu_cpf } = req.params;
 
   try {
