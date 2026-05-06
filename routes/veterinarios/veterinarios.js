@@ -1204,7 +1204,32 @@ route.get('/web-veterinarios/:id/security-status', async (req, res) => {
   }
 })
 
+// ========= ROTA PROCURAR OS ANIMAIS ASSOCIADOS AO VETERINARIO NO APP - VISÃO DO VETERINARIO =========
 
+route.get('/veterinarios/meus-animais/:nu_cpf', async (req, res) => {
+  const { nu_cpf } = req.params;
 
+  try {
+    // A mágica acontece aqui: Um único SELECT que liga as 3 tabelas
+    const query = `
+      SELECT a.* FROM mob_animais a
+      JOIN mob_veterinarios mv ON a.mob_veterinarios_id = mv.id
+      JOIN web_veterinarios wv ON mv.nu_crmv = wv.nu_crmv AND mv.ds_estado_crmv = wv.ds_estado_crmv
+      WHERE wv.nu_cpf = :nu_cpf
+    `;
+
+    // Usando o padrão Sequelize exato que já existe no seu arquivo
+    const animais = await sequelize.query(query, {
+      replacements: { nu_cpf },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    // Devolvemos a lista de animais diretamente
+    res.json(animais);
+  } catch (error) {
+    console.error("Erro ao procurar animais por CPF:", error);
+    res.status(500).json({ error: "Erro interno no servidor" });
+  }
+})
 
 module.exports = route;
