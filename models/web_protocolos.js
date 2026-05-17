@@ -3,9 +3,9 @@ const { Model } = require('sequelize');
 
 module.exports = (sequelize, DataTypes) => {
   class WebProtocolos extends Model {
-    
+
   }
-  
+
   WebProtocolos.init(
     {
       id: {
@@ -22,11 +22,11 @@ module.exports = (sequelize, DataTypes) => {
           key: 'id'
         }
       },
-      mob_protocolos_saude_id: {
+      web_protocolos_saude_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-          model: 'mob_protocolos_saude',
+          model: 'web_protocolos_saude',
           key: 'id'
         }
       },
@@ -58,6 +58,6 @@ module.exports = (sequelize, DataTypes) => {
       timestamps: false
     }
   );
-  
+
   return WebProtocolos;
 };
