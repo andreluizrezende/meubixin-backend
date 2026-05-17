@@ -1204,7 +1204,45 @@ route.get('/web-veterinarios/:id/security-status', async (req, res) => {
   }
 })
 
+// ========= ROTA BUSCAR ANIMAIS (PADRÃO SEQUELIZE - ADICIONE ANTES DAS ROTAS COM :id) =========
 
+route.get('/consulta-animais-vet-mob/:nu_cpf', async (req, res) => {
+  const { nu_cpf } = req.params;
 
+  try {
+    // 1. Busca o veterinário na WEB pelo CPF
+    const vetWeb = await web_veterinarios.findOne({
+      where: { nu_cpf: nu_cpf }
+    });
+
+    if (!vetWeb) {
+      return res.status(404).json({ message: "Veterinário não encontrado na base Web." });
+    }
+
+    // 2. Busca o vínculo no Mobile usando CRMV e UF
+    const vetMob = await mob_veterinarios.findOne({
+      where: { 
+        nu_crmv: vetWeb.nu_crmv, 
+        ds_estado_crmv: vetWeb.ds_estado_crmv 
+      }
+    });
+
+    if (!vetMob) {
+      return res.status(404).json({ message: "Vínculo profissional não localizado no mobile." });
+    }
+
+    // 3. Busca a lista final de animais
+    const listaAnimais = await mob_animais.findAll({
+      where: { mob_veterinarios_id: vetMob.id },
+      order: [['no_nome', 'ASC']]
+    });
+
+    res.json(listaAnimais);
+
+  } catch (error) {
+    console.log('ERRO em /veterinarios/meus-animais/:nu_cpf:', error.message);
+    res.status(500).json({ error: 'Erro interno no servidor' });
+  }
+});
 
 module.exports = route;
