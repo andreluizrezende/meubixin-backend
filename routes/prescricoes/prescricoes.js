@@ -241,6 +241,11 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
     const { anamneseId } = req.params;
     const { anamnese, protocolos } = req.body;
 
+    console.log('=== PUT /prescricoes/:anamneseId ===');
+    console.log('anamneseId (raw):', anamneseId, '| tipo:', typeof anamneseId);
+    console.log('anamnese recebida:', JSON.stringify(anamnese, null, 2));
+    console.log('protocolos recebidos:', JSON.stringify(protocolos, null, 2));
+
     if (!anamneseId || !anamnese) {
       await transaction.rollback();
       return res.status(400).json({
@@ -249,8 +254,24 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
       });
     }
 
+    // Verificar se a anamnese existe antes de qualquer coisa
+    const anamneseExistente = await WebAnamneses.findOne({
+      where: { id: parseInt(anamneseId) },
+      transaction
+    });
+
+    console.log('Anamnese existente no banco:', anamneseExistente ? `encontrada (id: ${anamneseExistente.id})` : 'NÃO ENCONTRADA');
+
+    if (!anamneseExistente) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: `Anamnese ${anamneseId} não encontrada no banco`
+      });
+    }
+
     // 1. Atualizar a anamnese existente
-    await WebAnamneses.update({
+    const updateResult = await WebAnamneses.update({
       web_veterinarios_id: anamnese.web_veterinarios_id,
       mob_animais_id: anamnese.mob_animais_id,
       dt_data_anamnese: anamnese.dt_data_anamnese,
@@ -262,49 +283,49 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
       vl_peso: anamnese.vl_peso,
       ds_temperatura: anamnese.ds_temperatura
     }, {
-      where: { id: anamneseId },
+      where: { id: parseInt(anamneseId) },
       transaction
     });
 
-    console.log(`Anamnese ${anamneseId} atualizada`);
+    console.log('Linhas afetadas pelo UPDATE da anamnese:', updateResult[0]);
 
-    // 2. Deletar protocolos e agendas antigos
-    // Primeiro buscar os IDs dos protocolos
+    // 2. Buscar protocolos antigos
     const protocolosAntigos = await WebProtocolos.findAll({
-      where: { web_anamneses_id: anamneseId },
+      where: { web_anamneses_id: parseInt(anamneseId) },
       attributes: ['id'],
       transaction
     });
 
     const protocolosIds = protocolosAntigos.map(p => p.id);
+    console.log(`Protocolos antigos encontrados: ${protocolosIds.length} | ids:`, protocolosIds);
 
-    // Deletar agendas dos protocolos
+    // 3. Deletar agendas antigas
     if (protocolosIds.length > 0) {
-      await WebProtocolosAgendas.destroy({
+      const agendasDeletadas = await WebProtocolosAgendas.destroy({
         where: {
-          web_protocolos_id: {
-            [Op.in]: protocolosIds
-          }
+          web_protocolos_id: { [Op.in]: protocolosIds }
         },
         transaction
       });
+      console.log('Agendas deletadas:', agendasDeletadas);
     }
 
-    // Deletar protocolos
-    await WebProtocolos.destroy({
-      where: { web_anamneses_id: anamneseId },
+    // 4. Deletar protocolos antigos
+    const protocolosDeletados = await WebProtocolos.destroy({
+      where: { web_anamneses_id: parseInt(anamneseId) },
       transaction
     });
+    console.log('Protocolos deletados:', protocolosDeletados);
 
-    console.log(`Protocolos e agendas antigos removidos da anamnese ${anamneseId}`);
-
-    // 3. Recriar protocolos e agendas
+    // 5. Recriar protocolos e agendas
     const protocolosCriados = [];
     const agendasCriadas = [];
 
     for (const protocolo of protocolos || []) {
+      console.log('Criando protocolo:', JSON.stringify(protocolo));
+
       const protocoloCriado = await WebProtocolos.create({
-        web_anamneses_id: anamneseId,
+        web_anamneses_id: parseInt(anamneseId),
         web_protocolos_saude_id: protocolo.web_protocolos_saude_id,
         nu_doses: protocolo.nu_doses,
         nu_intervalo_uso: protocolo.nu_intervalo_uso,
@@ -312,6 +333,8 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
         ds_dosagem: protocolo.ds_dosagem,
         st_tipo_protocolo: protocolo.st_tipo_protocolo
       }, { transaction });
+
+      console.log('Protocolo criado com id:', protocoloCriado.id, '| web_anamneses_id:', protocoloCriado.web_anamneses_id);
 
       protocolosCriados.push(protocoloCriado);
 
@@ -322,6 +345,8 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
         protocolo.tipo_intervalo_uso,
         anamnese.dt_data_anamnese
       );
+
+      console.log(`Agendas geradas para protocolo ${protocoloCriado.id}:`, agendasProtocolo.length);
 
       for (const agenda of agendasProtocolo) {
         const agendaCriada = await WebProtocolosAgendas.create({
@@ -334,8 +359,17 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
       }
     }
 
-    // 4. Commit
+    console.log(`Total criado: ${protocolosCriados.length} protocolos, ${agendasCriadas.length} agendas`);
+
+    // 6. Commit
     await transaction.commit();
+    console.log('✅ Commit realizado com sucesso');
+
+    // 7. Verificar se ainda existe após commit
+    const anamneseAposCommit = await WebAnamneses.findOne({
+      where: { id: parseInt(anamneseId) }
+    });
+    console.log('Anamnese após commit:', anamneseAposCommit ? `existe (mob_animais_id: ${anamneseAposCommit.mob_animais_id})` : 'SUMIU DO BANCO');
 
     res.json({
       success: true,
@@ -353,9 +387,9 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
     });
 
   } catch (error) {
-    console.log(error)
     await transaction.rollback();
-    console.error('ERRO em PUT /prescricoes/:anamneseId', error);
+    console.error('❌ ERRO em PUT /prescricoes/:anamneseId:', error.message);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Erro interno do servidor ao editar prescrição',
@@ -493,13 +527,15 @@ route.get('/prescricoes/:anamneseId', async (req, res) => {
     });
 
     // Calcular progresso
-    let totalDoses = agendas.length;
-    let dosesAplicadas = agendas.filter(agenda => agenda.st_concluido === 1).length;
+    const totalDoses = agendas.length;
+    const dosesAplicadas = agendas.filter(agenda => agenda.st_concluido === 1).length;
 
     // Montar resposta da prescrição
     const prescricao = {
       id: anamnese.id,
       anamnese_id: anamnese.id,
+      mob_animais_id: anamnese.mob_animais_id,         // ← adicionado
+      web_veterinarios_id: anamnese.web_veterinarios_id, // ← adicionado
       dt_data: anamnese.dt_data_anamnese,
       assinada: assinada,
       protocolos: protocolos.map(protocolo => ({
