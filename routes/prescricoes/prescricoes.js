@@ -740,11 +740,11 @@ route.get('/prescricoes/animal/:animalId', async (req, res) => {
         });
       });
 
-      let status = 'ativa';
+      let status = 'aguardando_assinatura';        
       if (totalDoses === 0) status = 'pendente';
       else if (dosesAplicadas === totalDoses) status = 'finalizada';
       else if (temDoseAtrasada) status = 'atrasada';
-      else if (dosesAplicadas > 0) status = 'em_andamento';
+      else if (dosesAplicadas > 0) status = 'assinado_digitalmente'; 
 
       anamnese.status = status;
       anamnese.progresso = {
@@ -1133,14 +1133,12 @@ function gerarHashDados(dados) {
   return crypto.createHash('sha256').update(conteudoOrdenado).digest('hex');
 }
 
-// Buscar dados para PDF (sem gerar o arquivo)
 route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
     const { anamneseId } = req.params;
 
-    // Buscar dados completos da prescrição
     const prescricaoSQL = `
       SELECT 
         a.id AS anamnese_id,
@@ -1171,12 +1169,15 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
         an.ds_especie,
         an.ds_sexo,
         an.vl_idade,
-        an.id
+        an.id,
+        t.no_completo AS tutor_nome,
+        t.nu_cpf AS tutor_cpf
       FROM web_anamneses a
       LEFT JOIN web_protocolos p ON p.web_anamneses_id = a.id
       LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
       INNER JOIN web_veterinarios v ON v.id = a.web_veterinarios_id
       INNER JOIN mob_animais an ON an.id = a.mob_animais_id
+      INNER JOIN mob_tutores t ON t.id = an.mob_tutores_id
       WHERE a.id = :anamneseId
     `;
 
@@ -1194,7 +1195,6 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
       });
     }
 
-    // Organizar dados para o PDF
     const primeiraLinha = resultados[0];
 
     const anamnese = {
@@ -1224,7 +1224,11 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
       id: primeiraLinha.id
     };
 
-    // Agrupar protocolos
+    const tutor = {
+      no_completo: primeiraLinha.tutor_nome,
+      nu_cpf: primeiraLinha.tutor_cpf
+    };
+
     const protocolosMap = {};
     resultados.forEach(linha => {
       if (linha.protocolo_id && !protocolosMap[linha.protocolo_id]) {
@@ -1245,13 +1249,12 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
       anamnese,
       veterinario,
       animal,
+      tutor,
       protocolos
     };
 
-    // GERAR HASH DOS DADOS (sem o código de verificação)
     const hashDados = gerarHashDados(dadosOrganizados);
 
-    // Verificar se já existe registro de assinatura pendente
     const registroExistente = await web_registros_prescricoes.findOne({
       where: {
         web_anamneses_id: anamneseId,
@@ -1263,15 +1266,11 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
     let codigoVerificacao;
 
     if (registroExistente) {
-      // Verificar se ainda está dentro do prazo
       const agora = new Date();
       if (agora < registroExistente.dt_expiracao) {
-        // AINDA VÁLIDO - verificar se o hash é o mesmo
         if (registroExistente.hash_original === hashDados) {
-          // Hash idêntico, pode usar o código existente
           codigoVerificacao = registroExistente.codigo_verificacao;
         } else {
-          // Dados mudaram - marcar como expirado e criar novo
           await registroExistente.update({ status: 'expirada' }, { transaction });
           codigoVerificacao = gerarCodigoVerificacao();
 
@@ -1288,7 +1287,6 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
           }, { transaction });
         }
       } else {
-        // EXPIRADO - marcar como expirado e criar novo
         await registroExistente.update({ status: 'expirada' }, { transaction });
         codigoVerificacao = gerarCodigoVerificacao();
 
@@ -1305,7 +1303,6 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
         }, { transaction });
       }
     } else {
-      // CRIAR NOVO REGISTRO
       codigoVerificacao = gerarCodigoVerificacao();
 
       const agora = new Date();
@@ -1321,25 +1318,23 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
       }, { transaction });
     }
 
-    // COMMIT APENAS UMA VEZ, NO FINAL
     await transaction.commit();
 
-    // Retornar dados organizados para o frontend (incluindo o hash para enviar no upload)
     res.json({
       success: true,
       codigoVerificacao,
-      hashDados, // Enviar o hash para o frontend incluir no upload
+      hashDados,
       dados: {
         codigoVerificacao,
         anamnese,
         veterinario,
         animal,
+        tutor,
         protocolos
       }
     });
 
   } catch (error) {
-    // ROLLBACK APENAS SE A TRANSAÇÃO AINDA ESTIVER ATIVA
     if (!transaction.finished) {
       await transaction.rollback();
     }
@@ -1352,101 +1347,6 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
     });
   }
 });
-
-const { verifyPDF } = require('../../utils/pdfVerification');
-
-route.post('/prescricoes/:anamneseId/upload-assinado',
-  upload.single('pdfAssinado'),
-  async (req, res) => {
-    const transaction = await sequelize.transaction();
-
-    try {
-      const { anamneseId } = req.params;
-      const arquivo = req.file;
-
-      if (!arquivo) {
-        await transaction.rollback();
-        return res.status(400).json({
-          success: false,
-          message: 'Arquivo PDF é obrigatório'
-        });
-      }
-
-      // Verificar se o PDF tem assinatura
-      const verificationResult = verifyPDF(arquivo.buffer);
-      console.log(verificationResult)
-
-      if (!verificationResult.verified) {
-        await transaction.rollback();
-        return res.status(400).json({
-          success: false,
-          message: 'O arquivo PDF não contém uma assinatura digital válida.'
-        });
-      }
-
-      // Buscar registro pendente
-      const registro = await web_registros_prescricoes.findOne({
-        where: {
-          web_anamneses_id: anamneseId,
-          status: 'pendente'
-        },
-        transaction
-      });
-
-      if (!registro) {
-        await transaction.rollback();
-        return res.status(404).json({
-          success: false,
-          message: 'Registro de prescrição não encontrado ou já processado'
-        });
-      }
-
-      // Verificar se ainda está dentro do prazo
-      const agora = new Date();
-      if (agora > registro.dt_expiracao) {
-        await registro.update({ status: 'expirada' }, { transaction });
-        await transaction.commit();
-        return res.status(400).json({
-          success: false,
-          message: 'Tempo para upload expirado. Gere um novo PDF.'
-        });
-      }
-
-      // Nome do arquivo no S3
-      const nomeArquivo = `prescricoes/${anamneseId}/${registro.codigo_verificacao}-assinado.pdf`;
-
-      // Upload para S3
-      const urlS3 = await uploadToS3(arquivo.buffer, nomeArquivo);
-
-      // Atualizar registro
-      await registro.update({
-        status: 'assinada',
-        arquivo_s3_path: nomeArquivo,
-        dt_assinatura: agora,
-        dt_upload: agora
-      }, { transaction });
-
-      await transaction.commit();
-
-      res.json({
-        success: true,
-        message: 'PDF assinado enviado com sucesso!',
-        codigoVerificacao: registro.codigo_verificacao,
-        urlVerificacao: `${process.env.FRONTEND_URL || ''}/verificar/${registro.codigo_verificacao}`
-      });
-
-    } catch (error) {
-      if (!transaction.finished) {
-        await transaction.rollback();
-      }
-      console.error('Erro no upload:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Erro interno no upload',
-        error: error.message
-      });
-    }
-  });
 
 // Portal de verificação pública
 route.get('/prescricoes/verificar/:codigo', async (req, res) => {
