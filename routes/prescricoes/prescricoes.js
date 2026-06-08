@@ -726,6 +726,18 @@ route.get('/prescricoes/animal/:animalId', async (req, res) => {
       }
     });
 
+    // Descobrir quais anamneses já possuem prescrição assinada digitalmente
+    // (fonte de verdade: web_registros_prescricoes, igual à rota de detalhe).
+    const anamneseIds = Object.keys(prescricoesMap);
+    let assinadasSet = new Set();
+    if (anamneseIds.length > 0) {
+      const assinadas = await web_registros_prescricoes.findAll({
+        where: { web_anamneses_id: anamneseIds, status: 'assinada' },
+        attributes: ['web_anamneses_id']
+      });
+      assinadasSet = new Set(assinadas.map(r => String(r.web_anamneses_id)));
+    }
+
     const prescricoes = Object.values(prescricoesMap).map((anamnese) => {
       let totalDoses = 0;
       let dosesAplicadas = 0;
@@ -740,13 +752,18 @@ route.get('/prescricoes/animal/:animalId', async (req, res) => {
         });
       });
 
-      let status = 'aguardando_assinatura';        
-      if (totalDoses === 0) status = 'pendente';
+      // O status de assinatura vem do registro assinado, não do progresso de doses.
+      const assinada = assinadasSet.has(String(anamnese.id));
+
+      let status;
+      if (assinada) status = 'assinado_digitalmente';
+      else if (totalDoses === 0) status = 'pendente';
       else if (dosesAplicadas === totalDoses) status = 'finalizada';
       else if (temDoseAtrasada) status = 'atrasada';
-      else if (dosesAplicadas > 0) status = 'assinado_digitalmente'; 
+      else status = 'aguardando_assinatura';
 
       anamnese.status = status;
+      anamnese.assinada = assinada;
       anamnese.progresso = {
         totalDoses,
         dosesAplicadas,
@@ -1344,6 +1361,71 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
       success: false,
       message: 'Erro interno ao buscar dados para PDF',
       error: error.message
+    });
+  }
+});
+
+// Upload do PDF assinado digitalmente
+route.post('/prescricoes/:anamneseId/upload-assinado', upload.single('pdfAssinado'), async (req, res) => {
+  try {
+    const { anamneseId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nenhum arquivo PDF foi enviado'
+      });
+    }
+
+    // Buscar o registro pendente mais recente desta anamnese
+    const registro = await web_registros_prescricoes.findOne({
+      where: {
+        web_anamneses_id: anamneseId,
+        status: 'pendente'
+      },
+      order: [['dt_criacao', 'DESC']]
+    });
+
+    if (!registro) {
+      return res.status(404).json({
+        success: false,
+        message: 'Nenhum registro de prescrição pendente encontrado. Gere o PDF novamente.'
+      });
+    }
+
+    // Verificar se o prazo de envio ainda é válido
+    if (new Date() > registro.dt_expiracao) {
+      await registro.update({ status: 'expirada' });
+      return res.status(410).json({
+        success: false,
+        message: 'O prazo para envio do PDF assinado expirou. Gere o PDF novamente.'
+      });
+    }
+
+    // Enviar o PDF assinado para o S3
+    const fileName = `prescricoes-assinadas/${registro.codigo_verificacao}.pdf`;
+    const uploadResult = await uploadToS3(req.file.buffer, fileName, 'application/pdf');
+
+    // Marcar o registro como assinado
+    const agora = new Date();
+    await registro.update({
+      status: 'assinada',
+      arquivo_s3_path: uploadResult.key,
+      dt_assinatura: agora,
+      dt_upload: agora
+    });
+
+    res.json({
+      success: true,
+      message: 'PDF assinado enviado com sucesso',
+      codigoVerificacao: registro.codigo_verificacao
+    });
+
+  } catch (error) {
+    console.error('Erro no upload do PDF assinado:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Erro interno ao enviar o PDF assinado'
     });
   }
 });
