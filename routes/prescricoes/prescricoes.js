@@ -1348,6 +1348,99 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
   }
 });
 
+route.post('/prescricoes/:anamneseId/upload-assinado',
+  upload.single('pdfAssinado'),
+  async (req, res) => {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const { anamneseId } = req.params;
+      const arquivo = req.file;
+
+      if (!arquivo) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'Arquivo PDF é obrigatório'
+        });
+      }
+
+      // Verificar se o PDF tem assinatura
+      const verificationResult = verifyPDF(arquivo.buffer);
+      console.log(verificationResult)
+
+      if (!verificationResult.verified) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'O arquivo PDF não contém uma assinatura digital válida.'
+        });
+      }
+
+      // Buscar registro pendente
+      const registro = await web_registros_prescricoes.findOne({
+        where: {
+          web_anamneses_id: anamneseId,
+          status: 'pendente'
+        },
+        transaction
+      });
+
+      if (!registro) {
+        await transaction.rollback();
+        return res.status(404).json({
+          success: false,
+          message: 'Registro de prescrição não encontrado ou já processado'
+        });
+      }
+
+      // Verificar se ainda está dentro do prazo
+      const agora = new Date();
+      if (agora > registro.dt_expiracao) {
+        await registro.update({ status: 'expirada' }, { transaction });
+        await transaction.commit();
+        return res.status(400).json({
+          success: false,
+          message: 'Tempo para upload expirado. Gere um novo PDF.'
+        });
+      }
+
+      // Nome do arquivo no S3
+      const nomeArquivo = `prescricoes/${anamneseId}/${registro.codigo_verificacao}-assinado.pdf`;
+
+      // Upload para S3
+      const urlS3 = await uploadToS3(arquivo.buffer, nomeArquivo);
+
+      // Atualizar registro
+      await registro.update({
+        status: 'assinada',
+        arquivo_s3_path: nomeArquivo,
+        dt_assinatura: agora,
+        dt_upload: agora
+      }, { transaction });
+
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: 'PDF assinado enviado com sucesso!',
+        codigoVerificacao: registro.codigo_verificacao,
+        urlVerificacao: `${process.env.FRONTEND_URL || ''}/verificar/${registro.codigo_verificacao}`
+      });
+
+    } catch (error) {
+      if (!transaction.finished) {
+        await transaction.rollback();
+      }
+      console.error('Erro no upload:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro interno no upload',
+        error: error.message
+      });
+    }
+  });
+
 // Portal de verificação pública
 route.get('/prescricoes/verificar/:codigo', async (req, res) => {
   try {
