@@ -4,6 +4,7 @@ const models = require('../../models');
 const { mob_tutores, WebAnamneses, WebProtocolos, WebProtocolosAgendas, MobProtocolosSaude } = models;
 const { Op } = require('sequelize');
 const { uploadToS3, getSignedUrlForDownload } = require("../../utils/s3_teste");
+const {verifyPDF} = require("../../utils/pdfVerification")
 
 // Configuração do Sequelize (igual ao seu arquivo de anamneses)
 const Sequelize = require("sequelize");
@@ -1369,11 +1370,9 @@ route.post('/prescricoes/:anamneseId/upload-assinado',
   upload.single('pdfAssinado'),
   async (req, res) => {
     const transaction = await sequelize.transaction();
-
     try {
       const { anamneseId } = req.params;
       const arquivo = req.file;
-
       if (!arquivo) {
         await transaction.rollback();
         return res.status(400).json({
@@ -1381,11 +1380,9 @@ route.post('/prescricoes/:anamneseId/upload-assinado',
           message: 'Arquivo PDF é obrigatório'
         });
       }
-
       // Verificar se o PDF tem assinatura
       const verificationResult = verifyPDF(arquivo.buffer);
       console.log(verificationResult)
-
       if (!verificationResult.verified) {
         await transaction.rollback();
         return res.status(400).json({
@@ -1393,7 +1390,6 @@ route.post('/prescricoes/:anamneseId/upload-assinado',
           message: 'O arquivo PDF não contém uma assinatura digital válida.'
         });
       }
-
       // Buscar registro pendente
       const registro = await web_registros_prescricoes.findOne({
         where: {
@@ -1402,7 +1398,6 @@ route.post('/prescricoes/:anamneseId/upload-assinado',
         },
         transaction
       });
-
       if (!registro) {
         await transaction.rollback();
         return res.status(404).json({
@@ -1410,7 +1405,6 @@ route.post('/prescricoes/:anamneseId/upload-assinado',
           message: 'Registro de prescrição não encontrado ou já processado'
         });
       }
-
       // Verificar se ainda está dentro do prazo
       const agora = new Date();
       if (agora > registro.dt_expiracao) {
@@ -1421,13 +1415,10 @@ route.post('/prescricoes/:anamneseId/upload-assinado',
           message: 'Tempo para upload expirado. Gere um novo PDF.'
         });
       }
-
       // Nome do arquivo no S3
       const nomeArquivo = `prescricoes/${anamneseId}/${registro.codigo_verificacao}-assinado.pdf`;
-
       // Upload para S3
       const urlS3 = await uploadToS3(arquivo.buffer, nomeArquivo);
-
       // Atualizar registro
       await registro.update({
         status: 'assinada',
@@ -1435,16 +1426,13 @@ route.post('/prescricoes/:anamneseId/upload-assinado',
         dt_assinatura: agora,
         dt_upload: agora
       }, { transaction });
-
       await transaction.commit();
-
       res.json({
         success: true,
         message: 'PDF assinado enviado com sucesso!',
         codigoVerificacao: registro.codigo_verificacao,
         urlVerificacao: `${process.env.FRONTEND_URL || ''}/verificar/${registro.codigo_verificacao}`
       });
-
     } catch (error) {
       if (!transaction.finished) {
         await transaction.rollback();
@@ -1457,6 +1445,9 @@ route.post('/prescricoes/:anamneseId/upload-assinado',
       });
     }
   });
+
+
+
 
 // Portal de verificação pública
 route.get('/prescricoes/verificar/:codigo', async (req, res) => {

@@ -1,7 +1,6 @@
 // ============================================
 // VERIFICAÇÃO SIMPLES: Apenas detecta se o PDF foi assinado
 // ============================================
-
 /**
  * Verifica se um PDF contém assinatura digital
  * @param {Buffer} pdfBuffer - Buffer do arquivo PDF
@@ -9,46 +8,29 @@
  */
 function verifyPDF(pdfBuffer) {
   try {
-    const pdfString = pdfBuffer.toString('latin1');
-    
-    // Indicadores de que o PDF tem assinatura digital:
-    
-    // 1. Presença do objeto /Type /Sig (objeto de assinatura)
-    const hasSignatureObject = pdfString.includes('/Type/Sig') || 
-                               pdfString.includes('/Type /Sig');
-    
-    // 2. Presença de /ByteRange (alcance dos bytes assinados)
-    const hasByteRange = pdfString.includes('/ByteRange');
-    
-    // 3. Presença de /Contents (conteúdo da assinatura)
-    const hasContents = pdfString.includes('/Contents<') || 
-                        pdfString.includes('/Contents <');
-    
-    // 4. Filtros de assinatura conhecidos
-    const hasSignatureFilter = pdfString.includes('/Adobe.PPKLite') ||
-                               pdfString.includes('/Adobe.PPKMS') ||
-                               pdfString.includes('/adbe.pkcs7.detached') ||
-                               pdfString.includes('/adbe.pkcs7.sha1') ||
-                               pdfString.includes('/ETSI.CAdES.detached') ||
-                               pdfString.includes('/ETSI.RFC3161');
-    
-    // PDF está assinado se tiver pelo menos:
-    // - Objeto de assinatura OU
-    // - ByteRange + Contents + Filtro de assinatura
-    const isSigned = hasSignatureObject || 
-                     (hasByteRange && hasContents && hasSignatureFilter);
-    
-    return {
-      verified: isSigned
-    };
-    
+    // 'binary' preserva os bytes sem transformação
+    const pdfString = pdfBuffer.toString('binary');
+
+    const hasSignatureObject = /\/Type\s*\/Sig/.test(pdfString);
+    const hasByteRange       = /\/ByteRange\s*[\[<]/.test(pdfString);
+    const hasContents        = /\/Contents\s*</.test(pdfString);
+    const hasSignatureFilter = /\/(Adobe\.PPKLite|Adobe\.PPKMS|adbe\.pkcs7\.detached|adbe\.pkcs7\.sha1|ETSI\.CAdES\.detached|ETSI\.RFC3161)/i.test(pdfString);
+
+    const isSigned = hasSignatureObject || (hasByteRange && hasContents);
+
+    console.log('verifyPDF →', {
+      hasSignatureObject,
+      hasByteRange,
+      hasContents,
+      hasSignatureFilter,
+      isSigned
+    });
+
+    return { verified: isSigned };
+
   } catch (error) {
     console.error('Erro ao verificar assinatura do PDF:', error);
-    return {
-      verified: false,
-      error: error.message
-    };
+    return { verified: false, error: error.message };
   }
 }
-
 module.exports = { verifyPDF };
