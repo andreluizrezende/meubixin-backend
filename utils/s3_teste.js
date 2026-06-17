@@ -10,10 +10,10 @@ const {
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
-const Bucket = AWS_BUCKET_NAME = "cicatribioskin";
-const region = AWS_BUCKET_REGION = "us-east-2";
-const accessKeyId = AWS_ACCESS_KEY = "REMOVED_AWS_ACCESS_KEY";
-const secretAccessKey = AWS_SECRET_KEY = "REMOVED_AWS_SECRET_KEY";
+const Bucket = process.env.AWS_BUCKET_NAME;
+const region = process.env.AWS_BUCKET_REGION;
+const accessKeyId = process.env.AWS_ACCESS_KEY;
+const secretAccessKey = process.env.AWS_SECRET_KEY;
 
 const s3 = new S3Client({
   region,
