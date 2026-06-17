@@ -5,7 +5,8 @@
     "database": "cicatribiovet",
     "host": "127.0.0.2",
     "dialect": "mysql",
-    "quoteIdentifiers": false
+    "quoteIdentifiers": false,
+    "timezone": "-03:00"
   },
   "test": {
     "username": "admin",
@@ -13,7 +14,8 @@
     "database": "cicatribiovet_dev",
     "host": "bioskin-mysql.coahrcxutrai.us-east-2.rds.amazonaws.com",
     "dialect": "mysql",
-    "quoteIdentifiers": false
+    "quoteIdentifiers": false,
+    "timezone": "-03:00"
   },
   "production": {
     "username": "cicatribiodev",
@@ -23,6 +25,7 @@
     "dialect": "mysql",
     "port": 10042,
     "logging": false,
-    "quoteIdentifiers": false
+    "quoteIdentifiers": false,
+    "timezone": "-03:00"
   }
 }

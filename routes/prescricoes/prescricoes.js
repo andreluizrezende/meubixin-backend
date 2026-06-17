@@ -34,6 +34,9 @@ const gerarAgendas = (protocoloId, numDoses, intervalo, tipoIntervalo, dataInici
     // Calcular data baseada no intervalo (primeira dose = data da anamnese)
     if (i > 0) {
       switch (tipoIntervalo) {
+        case 'H': // Horas
+          dataAplicacao.setHours(dataBase.getHours() + (intervalo * i));
+          break;
         case 'D': // Dias
           dataAplicacao.setDate(dataBase.getDate() + (intervalo * i));
           break;
@@ -240,7 +243,7 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
 
   try {
     const { anamneseId } = req.params;
-    const { anamnese, protocolos } = req.body;
+    const { anamnese, protocolos, agendas: agendasStatus } = req.body;
 
     console.log('=== PUT /prescricoes/:anamneseId ===');
     console.log('anamneseId (raw):', anamneseId, '| tipo:', typeof anamneseId);
@@ -322,7 +325,8 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
     const protocolosCriados = [];
     const agendasCriadas = [];
 
-    for (const protocolo of protocolos || []) {
+    for (let protocoloIdx = 0; protocoloIdx < (protocolos || []).length; protocoloIdx++) {
+      const protocolo = protocolos[protocoloIdx];
       console.log('Criando protocolo:', JSON.stringify(protocolo));
 
       const protocoloCriado = await WebProtocolos.create({
@@ -349,11 +353,16 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
 
       console.log(`Agendas geradas para protocolo ${protocoloCriado.id}:`, agendasProtocolo.length);
 
-      for (const agenda of agendasProtocolo) {
+      const statusDosesProtocolo = agendasStatus && agendasStatus[protocoloIdx] ? agendasStatus[protocoloIdx] : [];
+
+      for (let agendaIdx = 0; agendaIdx < agendasProtocolo.length; agendaIdx++) {
+        const agenda = agendasProtocolo[agendaIdx];
+        const stConcluido = statusDosesProtocolo[agendaIdx]?.st_concluido === 1 ? 1 : 0;
+
         const agendaCriada = await WebProtocolosAgendas.create({
           web_protocolos_id: protocoloCriado.id,
           dt_data_aplicacao: agenda.dt_data_aplicacao,
-          st_concluido: 0
+          st_concluido: stConcluido
         }, { transaction });
 
         agendasCriadas.push(agendaCriada);
@@ -1189,7 +1198,8 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
         an.vl_idade,
         an.id,
         t.no_completo AS tutor_nome,
-        t.nu_cpf AS tutor_cpf
+        t.nu_cpf AS tutor_cpf,
+        t.nu_telefone_completo AS tutor_telefone
       FROM web_anamneses a
       LEFT JOIN web_protocolos p ON p.web_anamneses_id = a.id
       LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
@@ -1244,7 +1254,8 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
 
     const tutor = {
       no_completo: primeiraLinha.tutor_nome,
-      nu_cpf: primeiraLinha.tutor_cpf
+      nu_cpf: primeiraLinha.tutor_cpf,
+      nu_telefone_completo: primeiraLinha.tutor_telefone
     };
 
     const protocolosMap = {};

@@ -39,6 +39,7 @@ const rotaParcerias = require('./routes/parcerias/pacerias')
 const rotaEspecies = require('./routes/tabelasControle/tipoEspecie')
 const rotaTipoFeridas = require('./routes/tabelasControle/tipoFeridas')
 const rotaProtocolosSaude = require('./routes/tabelasControle/mob_protocolos_saude')
+const rotaWebProtocolosSaude = require('./routes/tabelasControle/web_protocolos_saude')
 const rotaVeterinario = require('./routes/veterinarios/veterinarios')
 const rotaMedicamento = require('./routes/medicamentos/medicamentos')
 const rotaResetPass = require('./routes/resetPassword/resetPassword')
@@ -74,6 +75,7 @@ app.use(rotaParcerias);
 app.use(rotaEspecies);
 app.use(rotaTipoFeridas);
 app.use(rotaProtocolosSaude);
+app.use(rotaWebProtocolosSaude);
 app.use(rotaVeterinario);
 app.use(rotaMedicamento);
 app.use(rotaResetPass);
