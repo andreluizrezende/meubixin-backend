@@ -83,4 +83,8 @@ app.use(rotaPrescricoes);
 app.use(rotaParceiros);
 app.use(rotaAi);
 
-app.listen(PORT, () => console.log(`running on port: ${PORT}`));
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`running on port: ${PORT}`))
+}
+
+module.exports = app
