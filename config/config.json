@@ -1,29 +1,29 @@
 {
   "development": {
-    "username": "root",
-    "password": "@2368921",
-    "database": "cicatribiovet",
-    "host": "127.0.0.2",
+    "username": "",
+    "password": "",
+    "database": "",
+    "host": "",
     "dialect": "mysql",
     "quoteIdentifiers": false,
     "timezone": "-03:00"
   },
   "test": {
-    "username": "admin",
-    "password": "5131fc74",
-    "database": "cicatribiovet_dev",
-    "host": "bioskin-mysql.coahrcxutrai.us-east-2.rds.amazonaws.com",
+    "username": "",
+    "password": "",
+    "database": "",
+    "host": "",
     "dialect": "mysql",
     "quoteIdentifiers": false,
     "timezone": "-03:00"
   },
   "production": {
-    "username": "cicatribiodev",
-    "password": "xH12#%$&8*LoP",
-    "database": "cicatribiovet",
-    "host": "mysql-133499-0.cloudclusters.net",
+    "username": "",
+    "password": "",
+    "database": "",
+    "host": "",
     "dialect": "mysql",
-    "port": 10042,
+    "port": 0,
     "logging": false,
     "quoteIdentifiers": false,
     "timezone": "-03:00"
