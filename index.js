@@ -46,6 +46,7 @@ const rotaResetPass = require('./routes/resetPassword/resetPassword')
 const rotaPrescricoes = require('./routes/prescricoes/prescricoes')
 const rotaParceiros = require('./routes/parceiros/paceiros')
 const rotaAi = require('./routes/apiAI/apiAi')
+const rotaConferencias = require('./routes/conferencias/conferencias')
 
 app.use('/admin', adminRoutes);
 app.use(rotaInicial);
@@ -82,6 +83,7 @@ app.use(rotaResetPass);
 app.use(rotaPrescricoes);
 app.use(rotaParceiros);
 app.use(rotaAi);
+app.use(rotaConferencias);
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`running on port: ${PORT}`))
