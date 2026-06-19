@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: meubixin-backend
+    runtime: node
+    plan: free
+    branch: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Banco de dados (produção) - definir os valores no painel do Render
+      - key: PROD_DB_HOST
+        sync: false
+      - key: PROD_DB_PORT
+        sync: false
+      - key: PROD_DB_NAME
+        sync: false
+      - key: PROD_DB_USER
+        sync: false
+      - key: PROD_DB_PASS
+        sync: false
+      # AWS S3 - definir os valores no painel do Render
+      - key: AWS_BUCKET_NAME
+        sync: false
+      - key: AWS_BUCKET_REGION
+        sync: false
+      - key: AWS_ACCESS_KEY
+        sync: false
+      - key: AWS_SECRET_KEY
+        sync: false
+      # URLs do frontend
+      - key: FRONTEND_URL
+        sync: false
+      - key: CLIENT_URL
+        sync: false

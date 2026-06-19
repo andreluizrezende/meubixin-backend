@@ -4,7 +4,7 @@ const models = require("../../models");
 const { MobParcerias, mob_tipo_parcerias } = models;
 const Sequelize = require("sequelize");
 const env = process.env.NODE_ENV || "production";
-const config = require("../../config/config.json")[env];
+const config = require("../../config/config.js")[env];
 
 let sequelize;
 if (config.use_env_variable) {

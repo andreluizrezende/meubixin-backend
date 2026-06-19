@@ -4,7 +4,7 @@ const models = require("../../models");
 const { mob_anamneses } = models;
 const Sequelize = require("sequelize");
 const env = process.env.NODE_ENV || "production";
-const config = require("../../config/config.json")[env];
+const config = require("../../config/config.js")[env];
 const { uploadFile, deleteFile, getFileStream, fileExists } = require("../../utils/s3_teste");
 
 
