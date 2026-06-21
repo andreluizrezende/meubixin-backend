@@ -151,7 +151,7 @@ Em caso de dúvidas: suporte@cicatribio.com.br
 // POST /conferencias
 route.post('/conferencias', async (req, res) => {
   try {
-    const { web_veterinarios_id, mob_animais_id, nome_animal, email_tutor, nome_vet, telefone_tutor } = req.body;
+    const { web_veterinarios_id, mob_animais_id, nome_animal, email_tutor, nome_vet, nu_telefone_completo } = req.body;
 
     if (!web_veterinarios_id || !mob_animais_id || !nome_animal || !email_tutor) {
       return res.status(400).json({
@@ -181,9 +181,9 @@ route.post('/conferencias', async (req, res) => {
     });
 
     let whatsappEnviado = false;
-    if (telefone_tutor) {
+    if (nu_telefone_completo) {
       whatsappEnviado = await enviarWhatsAppTutor({
-        telefone: telefone_tutor,
+        telefone: nu_telefone_completo,
         nomeAnimal: nome_animal,
         link,
         nomeVet: nome_vet || 'Veterinário'
@@ -227,6 +227,36 @@ route.get('/conferencias/animal/:animalId', async (req, res) => {
   } catch (error) {
     console.error('ERRO em GET /conferencias/animal/:animalId:', error.message);
     res.status(500).json({ success: false, message: 'Erro ao buscar conferências', error: error.message });
+  }
+});
+
+// POST /conferencias/:id/whatsapp
+route.post('/conferencias/:id/whatsapp', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nu_telefone_completo } = req.body;
+
+    if (!nu_telefone_completo) {
+      return res.status(400).json({ success: false, message: 'nu_telefone_completo é obrigatório' });
+    }
+
+    const conferencia = await WebConferencias.findByPk(id);
+    if (!conferencia) {
+      return res.status(404).json({ success: false, message: 'Conferência não encontrada' });
+    }
+
+    await enviarWhatsAppTutor({
+      telefone: nu_telefone_completo,
+      nomeAnimal: 'seu animal',
+      link: conferencia.ds_link,
+      nomeVet: 'Veterinário'
+    });
+
+    res.json({ success: true, message: 'WhatsApp enviado com sucesso' });
+
+  } catch (error) {
+    console.error('ERRO em POST /conferencias/:id/whatsapp:', error.message);
+    res.status(500).json({ success: false, message: 'Erro ao enviar WhatsApp', error: error.message });
   }
 });
 
