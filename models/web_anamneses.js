@@ -5,9 +5,11 @@ const {
 
 module.exports = (sequelize, DataTypes) => {
   class WebAnamneses extends Model {
-
+    static associate(models) {
+      WebAnamneses.hasMany(models.WebProtocolos, { as: 'protocolos', foreignKey: 'web_anamneses_id' });
+    }
   }
-  
+
   WebAnamneses.init(
     {
       id: {
