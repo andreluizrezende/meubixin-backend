@@ -3,6 +3,7 @@ const route = express.Router();
 const models = require('../../models');
 const { WebConferencias } = models;
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 
 const createTransporter = () => nodemailer.createTransport({
   host: 'smtp.hostinger.com',
@@ -103,10 +104,54 @@ async function enviarEmailTutor({ emailTutor, nomeAnimal, link, nomeVet }) {
   }
 }
 
+async function enviarWhatsAppTutor({ telefone, nomeAnimal, link, nomeVet }) {
+  try {
+    let numeroFormatado = telefone.replace(/\D/g, '');
+
+    if (numeroFormatado.length === 11 && numeroFormatado[2] === '9') {
+      numeroFormatado = numeroFormatado.substring(0, 2) + numeroFormatado.substring(3);
+    }
+
+    if (!numeroFormatado.startsWith('55')) {
+      numeroFormatado = '55' + numeroFormatado;
+    }
+
+    const toNumber = `${numeroFormatado}@s.whatsapp.net`;
+
+    const message = `📹 *Consulta Online - Meu Bixin*
+
+Olá, tutor(a) de *${nomeAnimal}*!
+
+O(a) Dr(a). *${nomeVet}* está aguardando você em uma videochamada para consultar *${nomeAnimal}*.
+
+🔗 *Acesse pelo link abaixo (não precisa instalar nada):*
+${link}
+
+✅ Funciona direto no navegador, é só clicar!
+
+Em caso de dúvidas: suporte@cicatribio.com.br
+
+---
+*Meu Bixin*`;
+
+    await axios.post(
+      'https://coral-app-f97ui.ondigitalocean.app/send-message',
+      { to: toNumber, message },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+
+    console.log(`✅ WhatsApp de conferência enviado para: ${toNumber}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao enviar WhatsApp de conferência:', error.message);
+    return false;
+  }
+}
+
 // POST /conferencias
 route.post('/conferencias', async (req, res) => {
   try {
-    const { web_veterinarios_id, mob_animais_id, nome_animal, email_tutor, nome_vet } = req.body;
+    const { web_veterinarios_id, mob_animais_id, nome_animal, email_tutor, nome_vet, telefone_tutor } = req.body;
 
     if (!web_veterinarios_id || !mob_animais_id || !nome_animal || !email_tutor) {
       return res.status(400).json({
@@ -135,10 +180,20 @@ route.post('/conferencias', async (req, res) => {
       nomeVet: nome_vet || 'Veterinário'
     });
 
+    let whatsappEnviado = false;
+    if (telefone_tutor) {
+      whatsappEnviado = await enviarWhatsAppTutor({
+        telefone: telefone_tutor,
+        nomeAnimal: nome_animal,
+        link,
+        nomeVet: nome_vet || 'Veterinário'
+      });
+    }
+
     res.status(201).json({
       success: true,
       message: 'Conferência criada com sucesso',
-      data: { id: conferencia.id, link, email_enviado: emailEnviado }
+      data: { id: conferencia.id, link, email_enviado: emailEnviado, whatsapp_enviado: whatsappEnviado }
     });
 
   } catch (error) {
