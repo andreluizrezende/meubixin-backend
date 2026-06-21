@@ -104,7 +104,7 @@ async function enviarEmailTutor({ emailTutor, nomeAnimal, link, nomeVet }) {
   }
 }
 
-async function enviarWhatsAppTutor({ telefone, nomeAnimal, link, nomeVet }) {
+async function enviarWhatsAppTutor({ telefone, nomeAnimal, link, nomeVet, nomeTutor }) {
   try {
     let numeroFormatado = telefone.replace(/\D/g, '');
 
@@ -124,9 +124,11 @@ async function enviarWhatsAppTutor({ telefone, nomeAnimal, link, nomeVet }) {
 
     const toNumber = `${numeroFormatado}@s.whatsapp.net`;
 
+    const saudacao = nomeTutor ? `Olá, *${nomeTutor}*!` : `Olá!`;
+
     const message = `📹 *Consulta Online - Meu Bixin*
 
-Olá, tutor(a) de *${nomeAnimal}*!
+${saudacao}
 
 O(a) Dr(a). *${nomeVet}* está aguardando você em uma videochamada para consultar *${nomeAnimal}*.
 
@@ -157,7 +159,7 @@ Em caso de dúvidas: suporte@cicatribio.com.br
 // POST /conferencias
 route.post('/conferencias', async (req, res) => {
   try {
-    const { web_veterinarios_id, mob_animais_id, nome_animal, email_tutor, nome_vet, nu_telefone_completo } = req.body;
+    const { web_veterinarios_id, mob_animais_id, nome_animal, nome_tutor, email_tutor, nome_vet, nu_telefone_completo } = req.body;
 
     if (!web_veterinarios_id || !mob_animais_id || !nome_animal || !email_tutor) {
       return res.status(400).json({
@@ -192,7 +194,8 @@ route.post('/conferencias', async (req, res) => {
         telefone: nu_telefone_completo,
         nomeAnimal: nome_animal,
         link,
-        nomeVet: nome_vet || 'Veterinário'
+        nomeVet: nome_vet || 'Veterinário',
+        nomeTutor: nome_tutor || null
       });
     }
 
@@ -240,7 +243,7 @@ route.get('/conferencias/animal/:animalId', async (req, res) => {
 route.post('/conferencias/:id/whatsapp', async (req, res) => {
   try {
     const { id } = req.params;
-    const { nu_telefone_completo } = req.body;
+    const { nu_telefone_completo, nome_tutor, nome_animal } = req.body;
 
     if (!nu_telefone_completo) {
       return res.status(400).json({ success: false, message: 'nu_telefone_completo é obrigatório' });
@@ -253,9 +256,10 @@ route.post('/conferencias/:id/whatsapp', async (req, res) => {
 
     await enviarWhatsAppTutor({
       telefone: nu_telefone_completo,
-      nomeAnimal: 'seu animal',
+      nomeAnimal: nome_animal || 'seu animal',
       link: conferencia.ds_link,
-      nomeVet: 'Veterinário'
+      nomeVet: 'Veterinário',
+      nomeTutor: nome_tutor || null
     });
 
     res.json({ success: true, message: 'WhatsApp enviado com sucesso' });
