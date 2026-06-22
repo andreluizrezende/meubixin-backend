@@ -268,7 +268,7 @@ route.post('/conferencias/:id/whatsapp', async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { nu_telefone_completo, nome_tutor, nome_animal } = req.body;
+    const { nu_telefone_completo, nome_tutor, nome_animal, nome_vet } = req.body;
 
     if (!nu_telefone_completo) {
       console.warn('[WA-ROUTE] ✗ nu_telefone_completo ausente no body');
@@ -287,7 +287,7 @@ route.post('/conferencias/:id/whatsapp', async (req, res) => {
       telefone: nu_telefone_completo,
       nomeAnimal: nome_animal || 'seu animal',
       link: conferencia.ds_link,
-      nomeVet: 'Veterinário',
+      nomeVet: nome_vet || 'Veterinário',
       nomeTutor: nome_tutor || null
     });
 
