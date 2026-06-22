@@ -105,24 +105,34 @@ async function enviarEmailTutor({ emailTutor, nomeAnimal, link, nomeVet }) {
 }
 
 async function enviarWhatsAppTutor({ telefone, nomeAnimal, link, nomeVet, nomeTutor }) {
+  console.log('[WA] ▶ enviarWhatsAppTutor iniciado');
+  console.log('[WA] telefone recebido:', telefone);
+  console.log('[WA] nomeAnimal:', nomeAnimal, '| nomeVet:', nomeVet, '| nomeTutor:', nomeTutor);
+  console.log('[WA] link:', link);
+
   try {
     let numeroFormatado = telefone.replace(/\D/g, '');
+    console.log('[WA] após remover não-dígitos:', numeroFormatado, '| tamanho:', numeroFormatado.length);
 
-    // sem DDI: 11 dígitos (DDD + 9 + 8) → remove o 9 e prepende 55
+    // sem DDI: 11 dígitos (DDD + 9 + 8) → remove o 9
     if (numeroFormatado.length === 11 && numeroFormatado[2] === '9') {
       numeroFormatado = numeroFormatado.substring(0, 2) + numeroFormatado.substring(3);
+      console.log('[WA] removido 9 de número local 11 dígitos → agora:', numeroFormatado);
     }
 
     if (!numeroFormatado.startsWith('55')) {
       numeroFormatado = '55' + numeroFormatado;
+      console.log('[WA] adicionado DDI 55 → agora:', numeroFormatado);
     }
 
     // com DDI: 13 dígitos (55 + DDD + 9 + 8) → remove o 9
     if (numeroFormatado.length === 13 && numeroFormatado[4] === '9') {
       numeroFormatado = numeroFormatado.substring(0, 4) + numeroFormatado.substring(5);
+      console.log('[WA] removido 9 de número com DDI 13 dígitos → agora:', numeroFormatado);
     }
 
     const toNumber = `${numeroFormatado}@s.whatsapp.net`;
+    console.log('[WA] número final para envio:', toNumber);
 
     const saudacao = nomeTutor ? `Olá, *${nomeTutor}*!` : `Olá!`;
 
@@ -142,16 +152,22 @@ Em caso de dúvidas: suporte@cicatribio.com.br
 ---
 *Meu Bixin*`;
 
-    await axios.post(
+    console.log('[WA] disparando POST para API WhatsApp...');
+    const resposta = await axios.post(
       'https://coral-app-f97ui.ondigitalocean.app/send-message',
       { to: toNumber, message },
       { headers: { 'Content-Type': 'application/json' } }
     );
+    console.log('[WA] ✅ resposta da API WhatsApp — status:', resposta.status, '| data:', JSON.stringify(resposta.data));
 
-    console.log(`✅ WhatsApp de conferência enviado para: ${toNumber}`);
     return true;
   } catch (error) {
-    console.error('❌ Erro ao enviar WhatsApp de conferência:', error.message);
+    console.error('[WA] ❌ erro ao enviar WhatsApp:', error.message);
+    if (error.response) {
+      console.error('[WA] resposta de erro da API — status:', error.response.status, '| data:', JSON.stringify(error.response.data));
+    } else if (error.request) {
+      console.error('[WA] sem resposta da API (timeout ou rede):', error.request);
+    }
     return false;
   }
 }
@@ -241,20 +257,28 @@ route.get('/conferencias/animal/:animalId', async (req, res) => {
 
 // POST /conferencias/:id/whatsapp
 route.post('/conferencias/:id/whatsapp', async (req, res) => {
+  console.log('[WA-ROUTE] ▶ POST /conferencias/:id/whatsapp recebido');
+  console.log('[WA-ROUTE] params:', req.params);
+  console.log('[WA-ROUTE] body:', req.body);
+
   try {
     const { id } = req.params;
     const { nu_telefone_completo, nome_tutor, nome_animal } = req.body;
 
     if (!nu_telefone_completo) {
+      console.warn('[WA-ROUTE] ✗ nu_telefone_completo ausente no body');
       return res.status(400).json({ success: false, message: 'nu_telefone_completo é obrigatório' });
     }
 
+    console.log('[WA-ROUTE] buscando conferência id:', id);
     const conferencia = await WebConferencias.findByPk(id);
     if (!conferencia) {
+      console.warn('[WA-ROUTE] ✗ conferência não encontrada para id:', id);
       return res.status(404).json({ success: false, message: 'Conferência não encontrada' });
     }
+    console.log('[WA-ROUTE] conferência encontrada — link:', conferencia.ds_link);
 
-    await enviarWhatsAppTutor({
+    const enviado = await enviarWhatsAppTutor({
       telefone: nu_telefone_completo,
       nomeAnimal: nome_animal || 'seu animal',
       link: conferencia.ds_link,
@@ -262,10 +286,15 @@ route.post('/conferencias/:id/whatsapp', async (req, res) => {
       nomeTutor: nome_tutor || null
     });
 
-    res.json({ success: true, message: 'WhatsApp enviado com sucesso' });
+    console.log('[WA-ROUTE] resultado enviarWhatsAppTutor:', enviado);
+    if (enviado) {
+      res.json({ success: true, message: 'WhatsApp enviado com sucesso' });
+    } else {
+      res.status(500).json({ success: false, message: 'Falha ao enviar WhatsApp — verifique os logs do servidor' });
+    }
 
   } catch (error) {
-    console.error('ERRO em POST /conferencias/:id/whatsapp:', error.message);
+    console.error('[WA-ROUTE] ❌ exceção na rota:', error.message);
     res.status(500).json({ success: false, message: 'Erro ao enviar WhatsApp', error: error.message });
   }
 });
