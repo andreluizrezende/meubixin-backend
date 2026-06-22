@@ -106,6 +106,10 @@ async function enviarEmailTutor({ emailTutor, nomeAnimal, link, nomeVet }) {
 
 async function enviarWhatsAppTutor({ telefone, nomeAnimal, link, nomeVet, nomeTutor }) {
   console.log('[WA] ▶ enviarWhatsAppTutor iniciado');
+  console.log('[WA] .env PROD_DB_HOST:', process.env.PROD_DB_HOST);
+  console.log('[WA] .env PROD_DB_PORT:', process.env.PROD_DB_PORT);
+  console.log('[WA] .env PROD_DB_NAME:', process.env.PROD_DB_NAME);
+  console.log('[WA] .env PROD_DB_USER:', process.env.PROD_DB_USER);
   console.log('[WA] telefone recebido:', telefone);
   console.log('[WA] nomeAnimal:', nomeAnimal, '| nomeVet:', nomeVet, '| nomeTutor:', nomeTutor);
   console.log('[WA] link:', link);
