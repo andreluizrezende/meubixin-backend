@@ -1,5 +1,7 @@
 'use strict';
 
+require('mysql2'); // garante que o file tracer do Vercel inclua o pacote no deploy
+
 const fs = require('fs');
 const path = require('path');
 const Sequelize = require('sequelize');
