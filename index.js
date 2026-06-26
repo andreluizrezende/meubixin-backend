@@ -7,6 +7,12 @@ const PORT = process.env.PORT || 3030;
 
 // middlewares
 app.use(cors());
+
+// Webhook do Stripe precisa do corpo CRU para validar a assinatura.
+// Deve ser montado ANTES do express.json global.
+const rotaWebhookStripe = require('./routes/webhooks/stripe');
+app.use('/webhooks/stripe', express.raw({ type: 'application/json' }), rotaWebhookStripe);
+
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
@@ -47,6 +53,10 @@ const rotaPrescricoes = require('./routes/prescricoes/prescricoes')
 const rotaParceiros = require('./routes/parceiros/paceiros')
 const rotaAi = require('./routes/apiAI/apiAi')
 const rotaConferencias = require('./routes/conferencias/conferencias')
+const rotaConnect = require('./routes/connect/connect')
+const rotaCobrancas = require('./routes/cobrancas/cobrancas')
+const rotaAssinatura = require('./routes/assinatura/assinatura')
+const rotaPublicoPagamento = require('./routes/publico/publico')
 
 app.use('/admin', adminRoutes);
 app.use(rotaInicial);
@@ -84,6 +94,10 @@ app.use(rotaPrescricoes);
 app.use(rotaParceiros);
 app.use(rotaAi);
 app.use(rotaConferencias);
+app.use(rotaConnect);
+app.use(rotaCobrancas);
+app.use(rotaAssinatura);
+app.use(rotaPublicoPagamento);
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`running on port: ${PORT}`))

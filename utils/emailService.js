@@ -7,12 +7,12 @@ const nodemailer = require("nodemailer");
 // Configurar transportador de email
 const createTransporter = () => {
     return nodemailer.createTransport({
-        host: "smtp.hostinger.com",
-        port: 587,
-        secure: false,
+        host: process.env.SMTP_HOST || "smtp.hostinger.com",
+        port: Number(process.env.SMTP_PORT) || 587,
+        secure: process.env.SMTP_SECURE === "true",
         auth: {
-            user: "suporte@cicatribio.com.br",
-            pass: "$up@Rt3ApP",
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
         },
         tls: {
             rejectUnauthorized: false,
@@ -240,7 +240,7 @@ async function sendResetPasswordEmail({ email, name, resetUrl, expiresAt }) {
         console.log('✅ Servidor de email pronto');
 
         const mailOptions = {
-            from: '"Meu Bixin" <suporte@cicatribio.com.br>',
+            from: process.env.SMTP_FROM || `"Meu Bixin" <${process.env.SMTP_USER}>`,
             to: email,
             subject: '🔐 Redefinição de Senha - Meu Bixin',
             html: createResetEmailTemplate({ name, resetUrl, expiresAt }),

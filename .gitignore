@@ -20,3 +20,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# database dumps (contem dados reais de producao)
+prod_dump.sql
+*_dump.sql
+*.dump

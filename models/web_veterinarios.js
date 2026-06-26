@@ -64,6 +64,25 @@ module.exports = (sequelize, DataTypes) => {
     ds_assinatura_s3: {
       type: DataTypes.STRING(500),
       allowNull: true
+    },
+    stripe_connect_account_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      unique: true
+    },
+    stripe_charges_enabled: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
+    stripe_details_submitted: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
+    stripe_customer_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true
     }
   }, {
     sequelize,

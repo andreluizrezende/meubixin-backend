@@ -3,12 +3,12 @@ var nodemailer = require("nodemailer");
 function sendEmail(ds_email, ds_senha) {
 
   let transporter = nodemailer.createTransport({
-    host: "smtp.hostinger.com", 
-    port: 587, 
-    secure: false, 
+    host: process.env.SMTP_HOST || "smtp.hostinger.com",
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === "true",
     auth: {
-      user: "suporte@cicatribio.com.br", 
-      pass: "$up@Rt3ApP", 
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
     },
     tls: {
       rejectUnauthorized: false,
@@ -26,7 +26,7 @@ function sendEmail(ds_email, ds_senha) {
 
 
   let mailOptions = {
-    from: "suporte@cicatribio.com.br", 
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to: ds_email, 
     subject: "Recuperação de senha: Aplicativo CicatribioVET", 
     text: "Essa é a sua nova senha: " + ds_senha, 
