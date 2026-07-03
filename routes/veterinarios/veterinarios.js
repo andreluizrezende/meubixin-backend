@@ -26,6 +26,7 @@ const {
 
 const { Op } = require('sequelize');
 const axios = require('axios');
+const { signAuthToken } = require('../../utils/authToken');
 // ============= ROTAS PARA WEB_VETERINARIOS =============
 
 // Rota para validar CRMV + Estado e buscar dados pré-existentes
@@ -140,7 +141,7 @@ route.post('/web-veterinarios/login/google', async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Login com Google realizado com sucesso!",
-      token: `jwt_token_here_${veterinario.id}`, // Substitua por seu JWT real
+      token: signAuthToken(veterinario.id),
       veterinario: veterinarioResponse,
       googleData: {
         sub: payload['sub'],
@@ -274,7 +275,7 @@ route.post('/web-veterinarios/login', async (req, res) => {
     res.json({
       success: true,
       message: "Login realizado com sucesso!",
-      token: `jwt_token_here_${veterinario.id}`, // Substitua por seu JWT real
+      token: signAuthToken(veterinario.id),
       veterinario: veterinarioResponse
     });
 
@@ -475,7 +476,7 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
       message: googleData 
         ? "Conta criada com sucesso usando Google!" 
         : "Conta criada com sucesso!",
-      token: `jwt_token_here_${novoWebVeterinario.id}`, // Substitua por seu JWT real
+      token: signAuthToken(novoWebVeterinario.id),
       veterinario: veterinarioResponse,
       ...(googleData && {
         googleData: {

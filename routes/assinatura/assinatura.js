@@ -4,21 +4,25 @@ const express = require('express');
 const route = express.Router();
 const models = require('../../models');
 const { web_veterinarios: WebVeterinarios, WebAssinaturas } = models;
+const requireAuth = require('../../middleware/requireAuth');
 const {
   getOrCreateCustomer,
   createSubscriptionCheckout,
   createBillingPortalSession
 } = require('../../utils/stripeBilling');
 
+// Todas as rotas de assinatura exigem autenticação; a identidade vem do token.
+route.use(requireAuth);
+
 // Considera a assinatura "ativa" para acesso quando active ou em trial.
 function assinaturaAtiva(status) {
   return status === 'active' || status === 'trialing';
 }
 
-// GET /assinatura/status/:vetId
+// GET /assinatura/status/:vetId  (o :vetId é ignorado; usa-se o id do token)
 route.get('/assinatura/status/:vetId', async (req, res) => {
   try {
-    const vet = await WebVeterinarios.findByPk(req.params.vetId);
+    const vet = await WebVeterinarios.findByPk(req.vetId);
     if (!vet) return res.status(404).json({ success: false, message: 'Veterinário não encontrado' });
 
     const assinatura = await WebAssinaturas.findOne({
@@ -43,8 +47,7 @@ route.get('/assinatura/status/:vetId', async (req, res) => {
 // POST /assinatura/checkout  body: { vetId }
 route.post('/assinatura/checkout', async (req, res) => {
   try {
-    const { vetId } = req.body;
-    const vet = await WebVeterinarios.findByPk(vetId);
+    const vet = await WebVeterinarios.findByPk(req.vetId);
     if (!vet) return res.status(404).json({ success: false, message: 'Veterinário não encontrado' });
 
     const customerId = await getOrCreateCustomer(vet);
@@ -59,8 +62,7 @@ route.post('/assinatura/checkout', async (req, res) => {
 // POST /assinatura/portal  body: { vetId }
 route.post('/assinatura/portal', async (req, res) => {
   try {
-    const { vetId } = req.body;
-    const vet = await WebVeterinarios.findByPk(vetId);
+    const vet = await WebVeterinarios.findByPk(req.vetId);
     if (!vet) return res.status(404).json({ success: false, message: 'Veterinário não encontrado' });
     if (!vet.stripe_customer_id) {
       return res.status(400).json({ success: false, message: 'Nenhuma assinatura encontrada' });

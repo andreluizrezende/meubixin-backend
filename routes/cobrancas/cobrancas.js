@@ -11,8 +11,12 @@ const {
   WebPagamentos,
   WebCobrancaAnexos
 } = models;
+const requireAuth = require('../../middleware/requireAuth');
 const { getStripe, getWebAppUrl } = require('../../utils/stripeClient');
 const { uploadToS3, getSignedUrlForDownload, deleteFile } = require('../../utils/s3_teste');
+
+// Todas as rotas de cobrança exigem autenticação; a identidade vem do token.
+route.use(requireAuth);
 
 // Upload de anexos: imagens e PDF, até 10 MB, em memória.
 const ANEXO_TIPOS = ['image/png', 'image/jpg', 'image/jpeg', 'application/pdf'];
@@ -47,8 +51,8 @@ function totalCents(itens) {
 // POST /cobrancas  body: { vetId, cliente_nome, cliente_email?, cliente_documento?, descricao?, itens: [] }
 route.post('/cobrancas', async (req, res) => {
   try {
-    const { vetId, cliente_nome, cliente_email, cliente_documento, descricao, itens } = req.body;
-    const vet = await WebVeterinarios.findByPk(vetId);
+    const { cliente_nome, cliente_email, cliente_documento, descricao, itens } = req.body;
+    const vet = await WebVeterinarios.findByPk(req.vetId);
     if (!vet) return res.status(404).json({ success: false, message: 'Veterinário não encontrado' });
     if (!cliente_nome || !String(cliente_nome).trim()) {
       return res.status(400).json({ success: false, message: 'Informe o nome do cliente' });
@@ -84,13 +88,11 @@ route.post('/cobrancas', async (req, res) => {
   }
 });
 
-// GET /cobrancas?vetId=
+// GET /cobrancas  (lista as cobranças do veterinário autenticado)
 route.get('/cobrancas', async (req, res) => {
   try {
-    const { vetId } = req.query;
-    if (!vetId) return res.status(400).json({ success: false, message: 'vetId obrigatório' });
     const cobrancas = await WebCobrancas.findAll({
-      where: { web_veterinarios_id: vetId },
+      where: { web_veterinarios_id: req.vetId },
       include: [{ model: WebCobrancaItens, as: 'itens' }],
       order: [['createdAt', 'DESC']]
     });
@@ -112,6 +114,9 @@ route.get('/cobrancas/:id', async (req, res) => {
       ]
     });
     if (!cobranca) return res.status(404).json({ success: false, message: 'Cobrança não encontrada' });
+    if (Number(cobranca.web_veterinarios_id) !== req.vetId) {
+      return res.status(403).json({ success: false, message: 'Cobrança não pertence a este veterinário' });
+    }
     return res.json({ success: true, cobranca });
   } catch (err) {
     console.error('GET /cobrancas/:id', err);
@@ -123,14 +128,13 @@ route.get('/cobrancas/:id', async (req, res) => {
 // Gera o link de pagamento (Checkout Session) na conta Connect do veterinário.
 route.post('/cobrancas/:id/checkout', async (req, res) => {
   try {
-    const { vetId } = req.body;
     const cobranca = await WebCobrancas.findByPk(req.params.id, {
       include: [{ model: WebCobrancaItens, as: 'itens' }]
     });
     if (!cobranca) return res.status(404).json({ success: false, message: 'Cobrança não encontrada' });
 
-    // Garante que a cobrança pertence ao veterinário informado.
-    if (vetId && Number(cobranca.web_veterinarios_id) !== Number(vetId)) {
+    // Garante que a cobrança pertence ao veterinário autenticado.
+    if (Number(cobranca.web_veterinarios_id) !== req.vetId) {
       return res.status(403).json({ success: false, message: 'Cobrança não pertence a este veterinário' });
     }
     if (cobranca.status === 'paga') {
@@ -206,7 +210,7 @@ async function carregarCobrancaDoVet(cobrancaId, vetId, res) {
 // POST /cobrancas/:id/anexos  (multipart: arquivo) body: { vetId }
 route.post('/cobrancas/:id/anexos', uploadAnexo.single('arquivo'), async (req, res) => {
   try {
-    const cobranca = await carregarCobrancaDoVet(req.params.id, req.body.vetId, res);
+    const cobranca = await carregarCobrancaDoVet(req.params.id, req.vetId, res);
     if (!cobranca) return;
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Envie um arquivo PDF ou imagem (até 10 MB)' });
@@ -233,6 +237,8 @@ route.post('/cobrancas/:id/anexos', uploadAnexo.single('arquivo'), async (req, r
 // GET /cobrancas/:id/anexos/:anexoId/url  → URL assinada temporária para abrir/baixar
 route.get('/cobrancas/:id/anexos/:anexoId/url', async (req, res) => {
   try {
+    const cobranca = await carregarCobrancaDoVet(req.params.id, req.vetId, res);
+    if (!cobranca) return;
     const anexo = await WebCobrancaAnexos.findByPk(req.params.anexoId);
     if (!anexo || Number(anexo.web_cobrancas_id) !== Number(req.params.id)) {
       return res.status(404).json({ success: false, message: 'Anexo não encontrado' });
@@ -248,7 +254,7 @@ route.get('/cobrancas/:id/anexos/:anexoId/url', async (req, res) => {
 // DELETE /cobrancas/:id/anexos/:anexoId  body: { vetId }
 route.delete('/cobrancas/:id/anexos/:anexoId', async (req, res) => {
   try {
-    const cobranca = await carregarCobrancaDoVet(req.params.id, req.body.vetId, res);
+    const cobranca = await carregarCobrancaDoVet(req.params.id, req.vetId, res);
     if (!cobranca) return;
 
     const anexo = await WebCobrancaAnexos.findByPk(req.params.anexoId);

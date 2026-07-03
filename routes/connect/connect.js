@@ -4,7 +4,11 @@ const express = require('express');
 const route = express.Router();
 const models = require('../../models');
 const { web_veterinarios: WebVeterinarios } = models;
+const requireAuth = require('../../middleware/requireAuth');
 const { getWebAppUrl } = require('../../utils/stripeClient');
+
+// Todas as rotas de Connect exigem autenticação; a identidade vem do token.
+route.use(requireAuth);
 const {
   createExpressAccount,
   retrieveConnectAccount,
@@ -23,10 +27,10 @@ function statusPayload(vet) {
   };
 }
 
-// GET /connect/status/:vetId
+// GET /connect/status/:vetId  (o :vetId é ignorado; usa-se o id do token)
 route.get('/connect/status/:vetId', async (req, res) => {
   try {
-    const vet = await WebVeterinarios.findByPk(req.params.vetId);
+    const vet = await WebVeterinarios.findByPk(req.vetId);
     if (!vet) return res.status(404).json({ success: false, message: 'Veterinário não encontrado' });
     return res.json({ success: true, ...statusPayload(vet) });
   } catch (err) {
@@ -39,8 +43,7 @@ route.get('/connect/status/:vetId', async (req, res) => {
 // Cria a conta Express se necessário e devolve a URL do account link.
 route.post('/connect/onboarding', async (req, res) => {
   try {
-    const { vetId } = req.body;
-    const vet = await WebVeterinarios.findByPk(vetId);
+    const vet = await WebVeterinarios.findByPk(req.vetId);
     if (!vet) return res.status(404).json({ success: false, message: 'Veterinário não encontrado' });
 
     let accountId = vet.stripe_connect_account_id;
@@ -73,8 +76,7 @@ route.post('/connect/onboarding', async (req, res) => {
 // Refaz accounts.retrieve e atualiza as flags localmente.
 route.post('/connect/sincronizar', async (req, res) => {
   try {
-    const { vetId } = req.body;
-    const vet = await WebVeterinarios.findByPk(vetId);
+    const vet = await WebVeterinarios.findByPk(req.vetId);
     if (!vet) return res.status(404).json({ success: false, message: 'Veterinário não encontrado' });
     if (!vet.stripe_connect_account_id) {
       return res.status(400).json({ success: false, message: 'Conta Stripe ainda não conectada' });
