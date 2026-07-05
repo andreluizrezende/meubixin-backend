@@ -418,9 +418,9 @@ route.post('/web-veterinarios/cadastro', async (req, res) => {
       }
     }
 
-    // Verificar se mob_veterinarios_id já tem cadastro web
+    // Verificar se mob_veterinarios_id já tem cadastro web com o mesmo CRMV
     const webVeterinarioExistente = await web_veterinarios.findOne({
-      where: { mob_veterinarios_id }
+      where: { mob_veterinarios_id, nu_crmv }
     });
     
     if (webVeterinarioExistente) {
