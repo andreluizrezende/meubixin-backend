@@ -55,7 +55,7 @@ route.post('/web-veterinarios/validar-crmv', async (req, res) => {
     
     // Verifica se já existe um cadastro web para este veterinário
     const webVeterinarioExistente = await web_veterinarios.findOne({
-      where: { mob_veterinarios_id: mobVeterinario.id }
+      where: { mob_veterinarios_id: mobVeterinario.id, nu_crmv: mobVeterinario.nu_crmv }
     });
     
     if (webVeterinarioExistente) {
