@@ -3,8 +3,6 @@ const route = express.Router();
 const models = require('../../models');
 const { mob_veterinarios, web_veterinarios, mob_protocolos_saude, mob_animais } = models;
 const { uploadFile, deleteFile, getFileStream } = require('../../utils/s3_teste');
-const fs = require('fs');
-const path = require('path');
 
 const bcrypt = require('bcrypt');
 const { OAuth2Client } = require('google-auth-library');
@@ -749,23 +747,14 @@ route.put('/web-veterinarios/:id/upload-image', async (req, res) => {
      console.log(`✅ Imagem anterior excluída com sucesso!`);
    }
 
-   // Criar arquivo temporário com a imagem base64
-   const tempFilePath = path.resolve(__dirname, `temp_${Date.now()}.png`);
-   
-   fs.writeFileSync(
-     tempFilePath,
-     imagem_base64.replace(/^data:image\/\w+;base64,/, ""), // Remove prefixo se existir
+   // Converter base64 para Buffer (sem arquivo temporário — compatível com Vercel)
+   const imageBuffer = Buffer.from(
+     imagem_base64.replace(/^data:image\/\w+;base64,/, ""),
      "base64"
    );
 
-   // Criar stream de leitura do arquivo
-   const fileStreamUpload = fs.createReadStream(tempFilePath);
-
    // Upload para S3
-   await uploadFile(fileStreamUpload, filePath);
-
-   // Remover arquivo temporário
-   fs.unlinkSync(tempFilePath);
+   await uploadFile(imageBuffer, filePath);
 
    // Atualizar campo correspondente no banco
    await web_veterinarios.update(
