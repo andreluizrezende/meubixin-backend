@@ -3,6 +3,7 @@ const route = express.Router();
 const models = require('../../models');
 const { WebConferencias } = models;
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 
 const createTransporter = () => nodemailer.createTransport({
   host: 'smtp.hostinger.com',
@@ -103,10 +104,83 @@ async function enviarEmailTutor({ emailTutor, nomeAnimal, link, nomeVet }) {
   }
 }
 
+async function enviarWhatsAppTutor({ telefone, nomeAnimal, link, nomeVet, nomeTutor }) {
+  console.log('[WA] ▶ enviarWhatsAppTutor iniciado');
+  console.log('[WA] .env API_BASE_URL:', process.env.API_BASE_URL);
+  console.log('[WA] .env PROD_DB_HOST:', process.env.PROD_DB_HOST);
+  console.log('[WA] .env PROD_DB_PORT:', process.env.PROD_DB_PORT);
+  console.log('[WA] .env PROD_DB_NAME:', process.env.PROD_DB_NAME);
+  console.log('[WA] .env PROD_DB_USER:', process.env.PROD_DB_USER);
+  console.log('[WA] telefone recebido:', telefone);
+  console.log('[WA] nomeAnimal:', nomeAnimal, '| nomeVet:', nomeVet, '| nomeTutor:', nomeTutor);
+  console.log('[WA] link:', link);
+
+  try {
+    let numeroFormatado = telefone.replace(/\D/g, '');
+    console.log('[WA] após remover não-dígitos:', numeroFormatado, '| tamanho:', numeroFormatado.length);
+
+    // sem DDI: 11 dígitos (DDD + 9 + 8) → remove o 9
+    if (numeroFormatado.length === 11 && numeroFormatado[2] === '9') {
+      numeroFormatado = numeroFormatado.substring(0, 2) + numeroFormatado.substring(3);
+      console.log('[WA] removido 9 de número local 11 dígitos → agora:', numeroFormatado);
+    }
+
+    if (!numeroFormatado.startsWith('55')) {
+      numeroFormatado = '55' + numeroFormatado;
+      console.log('[WA] adicionado DDI 55 → agora:', numeroFormatado);
+    }
+
+    // com DDI: 13 dígitos (55 + DDD + 9 + 8) → remove o 9
+    if (numeroFormatado.length === 13 && numeroFormatado[4] === '9') {
+      numeroFormatado = numeroFormatado.substring(0, 4) + numeroFormatado.substring(5);
+      console.log('[WA] removido 9 de número com DDI 13 dígitos → agora:', numeroFormatado);
+    }
+
+    const toNumber = `${numeroFormatado}@s.whatsapp.net`;
+    console.log('[WA] número final para envio:', toNumber);
+
+    const saudacao = nomeTutor ? `Olá, *${nomeTutor}*!` : `Olá!`;
+
+    const message = `📹 *Consulta Online - Meu Bixin*
+
+${saudacao}
+
+O(a) Dr(a). *${nomeVet}* está aguardando você em uma videochamada para consultar *${nomeAnimal}*.
+
+🔗 *Acesse pelo link abaixo (não precisa instalar nada):*
+${link}
+
+✅ Funciona direto no navegador, é só clicar!
+
+Em caso de dúvidas: suporte@cicatribio.com.br
+
+---
+*Meu Bixin*`;
+
+    console.log('[WA] disparando POST para API WhatsApp...');
+    const resposta = await axios.post(
+      'https://coral-app-f97ui.ondigitalocean.app/send-message',
+      { to: toNumber, message },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    console.log('[WA] ✅ resposta da API WhatsApp — status:', resposta.status, '| data:', JSON.stringify(resposta.data));
+
+    return true;
+  } catch (error) {
+    console.error('[WA] ❌ erro ao enviar WhatsApp:', error.message);
+    if (error.response) {
+      console.error('[WA] resposta de erro da API — status:', error.response.status, '| data:', JSON.stringify(error.response.data));
+    } else if (error.request) {
+      console.error('[WA] sem resposta da API (timeout ou rede):', error.request);
+    }
+    return false;
+  }
+}
+
 // POST /conferencias
 route.post('/conferencias', async (req, res) => {
   try {
-    const { web_veterinarios_id, mob_animais_id, nome_animal, email_tutor, nome_vet } = req.body;
+    const { web_veterinarios_id, mob_animais_id, nome_animal, nome_tutor, email_tutor, nome_vet, nu_telefone_completo } = req.body;
 
     if (!web_veterinarios_id || !mob_animais_id || !nome_animal || !email_tutor) {
       return res.status(400).json({
@@ -135,10 +209,21 @@ route.post('/conferencias', async (req, res) => {
       nomeVet: nome_vet || 'Veterinário'
     });
 
+    let whatsappEnviado = false;
+    if (nu_telefone_completo) {
+      whatsappEnviado = await enviarWhatsAppTutor({
+        telefone: nu_telefone_completo,
+        nomeAnimal: nome_animal,
+        link,
+        nomeVet: nome_vet || 'Veterinário',
+        nomeTutor: nome_tutor || null
+      });
+    }
+
     res.status(201).json({
       success: true,
       message: 'Conferência criada com sucesso',
-      data: { id: conferencia.id, link, email_enviado: emailEnviado }
+      data: { id: conferencia.id, link, email_enviado: emailEnviado, whatsapp_enviado: whatsappEnviado }
     });
 
   } catch (error) {
@@ -172,6 +257,50 @@ route.get('/conferencias/animal/:animalId', async (req, res) => {
   } catch (error) {
     console.error('ERRO em GET /conferencias/animal/:animalId:', error.message);
     res.status(500).json({ success: false, message: 'Erro ao buscar conferências', error: error.message });
+  }
+});
+
+// POST /conferencias/:id/whatsapp
+route.post('/conferencias/:id/whatsapp', async (req, res) => {
+  console.log('[WA-ROUTE] ▶ POST /conferencias/:id/whatsapp recebido');
+  console.log('[WA-ROUTE] params:', req.params);
+  console.log('[WA-ROUTE] body:', req.body);
+
+  try {
+    const { id } = req.params;
+    const { nu_telefone_completo, nome_tutor, nome_animal, nome_vet } = req.body;
+
+    if (!nu_telefone_completo) {
+      console.warn('[WA-ROUTE] ✗ nu_telefone_completo ausente no body');
+      return res.status(400).json({ success: false, message: 'nu_telefone_completo é obrigatório' });
+    }
+
+    console.log('[WA-ROUTE] buscando conferência id:', id);
+    const conferencia = await WebConferencias.findByPk(id);
+    if (!conferencia) {
+      console.warn('[WA-ROUTE] ✗ conferência não encontrada para id:', id);
+      return res.status(404).json({ success: false, message: 'Conferência não encontrada' });
+    }
+    console.log('[WA-ROUTE] conferência encontrada — link:', conferencia.ds_link);
+
+    const enviado = await enviarWhatsAppTutor({
+      telefone: nu_telefone_completo,
+      nomeAnimal: nome_animal || 'seu animal',
+      link: conferencia.ds_link,
+      nomeVet: nome_vet || 'Veterinário',
+      nomeTutor: nome_tutor || null
+    });
+
+    console.log('[WA-ROUTE] resultado enviarWhatsAppTutor:', enviado);
+    if (enviado) {
+      res.json({ success: true, message: 'WhatsApp enviado com sucesso' });
+    } else {
+      res.status(500).json({ success: false, message: 'Falha ao enviar WhatsApp — verifique os logs do servidor' });
+    }
+
+  } catch (error) {
+    console.error('[WA-ROUTE] ❌ exceção na rota:', error.message);
+    res.status(500).json({ success: false, message: 'Erro ao enviar WhatsApp', error: error.message });
   }
 });
 

@@ -3,7 +3,9 @@ const { Model } = require('sequelize');
 
 module.exports = (sequelize, DataTypes) => {
   class WebProtocolosAgendas extends Model {
-
+    static associate(models) {
+      WebProtocolosAgendas.belongsTo(models.WebProtocolos, { foreignKey: 'web_protocolos_id' });
+    }
   }
   
   WebProtocolosAgendas.init(

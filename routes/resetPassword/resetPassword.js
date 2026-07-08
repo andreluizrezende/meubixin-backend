@@ -327,14 +327,19 @@ async function sendResetWhatsApp(telefone, nome, resetUrl) {
     // Formatar número para WhatsApp
     let numeroFormatado = telefone.replace(/\D/g, '');
     
-    // Remover 9 extra se houver
+    // sem DDI: 11 dígitos (DDD + 9 + 8) → remove o 9 e prepende 55
     if (numeroFormatado.length === 11 && numeroFormatado[2] === '9') {
       numeroFormatado = numeroFormatado.substring(0, 2) + numeroFormatado.substring(3);
     }
-    
+
     // Adicionar código do país
     if (!numeroFormatado.startsWith('55')) {
       numeroFormatado = '55' + numeroFormatado;
+    }
+
+    // com DDI: 13 dígitos (55 + DDD + 9 + 8) → remove o 9
+    if (numeroFormatado.length === 13 && numeroFormatado[4] === '9') {
+      numeroFormatado = numeroFormatado.substring(0, 4) + numeroFormatado.substring(5);
     }
     
     const toNumber = `${numeroFormatado}@s.whatsapp.net`;

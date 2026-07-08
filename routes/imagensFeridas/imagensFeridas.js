@@ -1,10 +1,7 @@
 const express = require("express");
 const route = express.Router();
 const models = require("../../models");
-const { mob_imagens_feridas } = models;
-const Sequelize = require("sequelize");
-const config = require("../../config/config.js")[process.env.NODE_ENV || "development"];
-let sequelize = new Sequelize(config);
+const { mob_imagens_feridas, sequelize } = models;
 const { uploadFile, deleteFile, getFileStream, fileExists } = require("../../utils/s3_teste");
 
 route.get("/imagens_feridas", async (req, res) => {

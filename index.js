@@ -6,7 +6,12 @@ const PORT = process.env.PORT || 3030;
 
 
 // middlewares
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+}));
+app.options('*', cors());
 
 // Webhook do Stripe precisa do corpo CRU para validar a assinatura.
 // Deve ser montado ANTES do express.json global.

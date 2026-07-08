@@ -1,5 +1,7 @@
 'use strict';
 
+const mysql2 = require('mysql2');
+
 module.exports = {
   development: {
     username: process.env.DEV_DB_USER,
@@ -8,6 +10,7 @@ module.exports = {
     host: process.env.DEV_DB_HOST,
     port: process.env.DEV_DB_PORT || 3306,
     dialect: 'mysql',
+    dialectModule: mysql2,
     quoteIdentifiers: false,
     timezone: '-03:00'
   },
@@ -18,6 +21,7 @@ module.exports = {
     host: process.env.DEV_DB_HOST,
     port: process.env.DEV_DB_PORT || 3306,
     dialect: 'mysql',
+    dialectModule: mysql2,
     quoteIdentifiers: false,
     timezone: '-03:00'
   },
@@ -28,6 +32,7 @@ module.exports = {
     host: process.env.PROD_DB_HOST,
     port: process.env.PROD_DB_PORT || 3306,
     dialect: 'mysql',
+    dialectModule: mysql2,
     logging: false,
     quoteIdentifiers: false,
     timezone: '-03:00'

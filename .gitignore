@@ -25,3 +25,6 @@ yarn-error.log*
 prod_dump.sql
 *_dump.sql
 *.dump
+
+*.log
+test-db.js

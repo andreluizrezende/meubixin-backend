@@ -1,27 +1,13 @@
 const express = require('express');
 const route = express.Router();
 const models = require('../../models');
-const { mob_tutores, WebAnamneses, WebProtocolos, WebProtocolosAgendas, MobProtocolosSaude } = models;
+const { mob_tutores, WebAnamneses, WebProtocolos, WebProtocolosAgendas } = models;
+const MobProtocolosSaude = models['mob_protocolos_saude'];
 const { Op } = require('sequelize');
 const { uploadToS3, getSignedUrlForDownload } = require("../../utils/s3_teste");
 const {verifyPDF} = require("../../utils/pdfVerification")
 
-// Configuração do Sequelize (igual ao seu arquivo de anamneses)
-const Sequelize = require("sequelize");
-const env = process.env.NODE_ENV || "production";
-const config = require("../../config/config.js")[env];
-
-let sequelize;
-if (config.use_env_variable) {
-  sequelize = new Sequelize(process.env[config.use_env_variable], config);
-} else {
-  sequelize = new Sequelize(
-    config.database,
-    config.username,
-    config.password,
-    config
-  );
-}
+const sequelize = models.sequelize;
 
 // Função auxiliar para gerar agendas baseadas no protocolo
 const gerarAgendas = (protocoloId, numDoses, intervalo, tipoIntervalo, dataInicial) => {
