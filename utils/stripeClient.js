@@ -38,7 +38,7 @@ function getDefaultConnectCountry() {
 
 /** URL base do frontend (sem barra final), usada nos redirects. */
 function getWebAppUrl() {
-  const u = process.env.WEB_APP_URL || 'http://localhost:3000';
+  const u = process.env.WEB_APP_URL || 'https://meubixin.vercel.app';
   return u.replace(/\/$/, '');
 }
 

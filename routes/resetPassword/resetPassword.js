@@ -106,7 +106,7 @@ router.post('/web-veterinarios/request-reset', async (req, res) => {
     });
 
     // ✅ 7. Enviar por email ou WhatsApp
-    const resetUrl = `${process.env.CLIENT_URL || 'https://cicatribiovet-web-pi.vercel.app'}/reset-password?token=${plainToken}&id=${veterinario.id}`;
+    const resetUrl = `${process.env.CLIENT_URL || 'https://meubixin.vercel.app'}/reset-password?token=${plainToken}&id=${veterinario.id}`;
 
     if (ds_email) {
       // 📧 Enviar por email
