@@ -51,7 +51,7 @@ function totalCents(itens) {
 // POST /cobrancas  body: { vetId, cliente_nome, cliente_email?, cliente_documento?, descricao?, itens: [] }
 route.post('/cobrancas', async (req, res) => {
   try {
-    const { cliente_nome, cliente_email, cliente_documento, descricao, itens } = req.body;
+    const { cliente_nome, cliente_email, cliente_documento, descricao, itens, mob_animais_id } = req.body;
     const vet = await WebVeterinarios.findByPk(req.vetId);
     if (!vet) return res.status(404).json({ success: false, message: 'Veterinário não encontrado' });
     if (!cliente_nome || !String(cliente_nome).trim()) {
@@ -69,6 +69,7 @@ route.post('/cobrancas', async (req, res) => {
       cliente_email: cliente_email || null,
       cliente_documento: cliente_documento || null,
       descricao: descricao || null,
+      mob_animais_id: mob_animais_id || null,
       status: 'rascunho',
       total_cents: totalCents(itensNorm),
       currency: 'brl'
@@ -91,8 +92,12 @@ route.post('/cobrancas', async (req, res) => {
 // GET /cobrancas  (lista as cobranças do veterinário autenticado)
 route.get('/cobrancas', async (req, res) => {
   try {
+    const where = { web_veterinarios_id: req.vetId };
+    if (req.query.mob_animais_id) {
+      where.mob_animais_id = parseInt(req.query.mob_animais_id, 10);
+    }
     const cobrancas = await WebCobrancas.findAll({
-      where: { web_veterinarios_id: req.vetId },
+      where,
       include: [{ model: WebCobrancaItens, as: 'itens' }],
       order: [['createdAt', 'DESC']]
     });
