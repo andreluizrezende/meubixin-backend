@@ -349,7 +349,7 @@ route.post('/cobrancas/:id/checkout', async (req, res) => {
     return res.json(resultado);
   } catch (err) {
     console.error('POST /cobrancas/:id/checkout', err);
-    return res.status(500).json({ success: false, message: 'Erro ao gerar link de pagamento' });
+    return res.status(500).json({ success: false, message: `Erro ao gerar link de pagamento: ${err.message}` });
   }
 });
 
@@ -389,7 +389,7 @@ route.post('/cobrancas/:id/email', async (req, res) => {
     return res.json({ success: true, message: 'E-mail enviado com sucesso', url: linkResultado.url });
   } catch (err) {
     console.error('POST /cobrancas/:id/email', err);
-    return res.status(500).json({ success: false, message: 'Erro ao enviar e-mail' });
+    return res.status(500).json({ success: false, message: `Erro ao enviar e-mail: ${err.message}` });
   }
 });
 
@@ -431,7 +431,7 @@ route.post('/cobrancas/:id/whatsapp', async (req, res) => {
     return res.json({ success: true, message: 'WhatsApp enviado com sucesso', url: linkResultado.url });
   } catch (err) {
     console.error('POST /cobrancas/:id/whatsapp', err);
-    return res.status(500).json({ success: false, message: 'Erro ao enviar WhatsApp' });
+    return res.status(500).json({ success: false, message: `Erro ao enviar WhatsApp: ${err.message}` });
   }
 });
 
