@@ -33,7 +33,7 @@ route.get('/animais/completo', async (req, res) => {
       include: [
         {
           model: mob_tutores,
-          attributes: ['id', 'no_completo', 'ds_email', 'nu_telefone_completo'],
+          attributes: ['id', 'no_completo', 'ds_email', 'nu_telefone_completo', 'nu_cpf'],
           required: false // LEFT JOIN — retorna mesmo sem tutor vinculado
         }
       ],
@@ -67,7 +67,8 @@ route.get('/animais/completo', async (req, res) => {
         avatar: a.no_nome?.charAt(0)?.toUpperCase() || '?',
         proprietario: tutor?.no_completo || 'Tutor não informado',
         email: tutor?.ds_email || 'Email não informado',
-        telefone: tutor?.nu_telefone_completo || 'Telefone não informado'
+        telefone: tutor?.nu_telefone_completo || 'Telefone não informado',
+        documento: tutor?.nu_cpf ? String(tutor.nu_cpf) : ''
       }
     })
 

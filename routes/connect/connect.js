@@ -83,6 +83,10 @@ route.post('/connect/sincronizar', async (req, res) => {
     }
 
     const account = await retrieveConnectAccount(vet.stripe_connect_account_id);
+    console.log('[Connect Sync] account_id:', account.id,
+      '| charges_enabled:', account.charges_enabled,
+      '| details_submitted:', account.details_submitted,
+      '| requirements:', JSON.stringify(account.requirements?.currently_due));
     const flags = mapAccountToFlags(account);
     await WebVeterinarios.update(flags, { where: { id: vet.id } });
 

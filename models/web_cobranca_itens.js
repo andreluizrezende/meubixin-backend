@@ -28,6 +28,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(255),
         allowNull: false
       },
+      procedimento: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+      },
       quantidade: {
         type: DataTypes.INTEGER,
         allowNull: false,

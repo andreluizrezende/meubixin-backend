@@ -8,7 +8,9 @@
   },
   "scripts": {
     "start": "node ./index",
-    "dev": "nodemon ./index"
+    "dev": "nodemon ./index",
+    "stripe:listen": "stripe listen --forward-to localhost:3030/webhooks/stripe",
+    "dev:local": "concurrently -n server,stripe -c green,magenta \"npm:dev\" \"npm:stripe:listen\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.131.0",
@@ -32,6 +34,7 @@
     "yarn": "^1.22.19"
   },
   "devDependencies": {
+    "concurrently": "^10.0.3",
     "nodemon": "^2.0.22",
     "sequelize-cli": "^6.4.1"
   }

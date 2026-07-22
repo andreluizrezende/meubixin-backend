@@ -1223,6 +1223,7 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
     };
 
     const veterinario = {
+      id: primeiraLinha.web_veterinarios_id,
       no_completo: primeiraLinha.no_completo,
       nu_crmv: primeiraLinha.nu_crmv,
       ds_estado_crmv: primeiraLinha.ds_estado_crmv,

@@ -1,7 +1,7 @@
 const express = require('express');
 const route = express.Router();
 const models = require('../../models');
-const { WebConferencias } = models;
+const { WebConferencias, mob_animais: MobAnimais, mob_tutores: MobTutores, web_veterinarios: WebVeterinarios } = models;
 const nodemailer = require('nodemailer');
 const axios = require('axios');
 
@@ -268,7 +268,8 @@ route.post('/conferencias/:id/whatsapp', async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { nu_telefone_completo, nome_tutor, nome_animal, nome_vet } = req.body;
+    const { nu_telefone_completo } = req.body;
+    let { nome_tutor, nome_animal, nome_vet } = req.body;
 
     if (!nu_telefone_completo) {
       console.warn('[WA-ROUTE] ✗ nu_telefone_completo ausente no body');
@@ -282,6 +283,20 @@ route.post('/conferencias/:id/whatsapp', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Conferência não encontrada' });
     }
     console.log('[WA-ROUTE] conferência encontrada — link:', conferencia.ds_link);
+
+    // Reenvio a partir da lista (sem nomes no body): completa buscando no banco.
+    if (!nome_animal || !nome_vet || !nome_tutor) {
+      const [animal, vet] = await Promise.all([
+        MobAnimais.findByPk(conferencia.mob_animais_id),
+        WebVeterinarios.findByPk(conferencia.web_veterinarios_id)
+      ]);
+      if (!nome_animal) nome_animal = animal?.no_nome;
+      if (!nome_vet) nome_vet = vet?.no_completo;
+      if (!nome_tutor && animal?.mob_tutores_id) {
+        const tutor = await MobTutores.findByPk(animal.mob_tutores_id);
+        nome_tutor = tutor?.no_completo;
+      }
+    }
 
     const enviado = await enviarWhatsAppTutor({
       telefone: nu_telefone_completo,
@@ -301,6 +316,43 @@ route.post('/conferencias/:id/whatsapp', async (req, res) => {
   } catch (error) {
     console.error('[WA-ROUTE] ❌ exceção na rota:', error.message);
     res.status(500).json({ success: false, message: 'Erro ao enviar WhatsApp', error: error.message });
+  }
+});
+
+// POST /conferencias/:id/email
+// Reenvia o e-mail com o link da sala para o tutor (mesmos dados já salvos na conferência).
+route.post('/conferencias/:id/email', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const conferencia = await WebConferencias.findByPk(id);
+    if (!conferencia) {
+      return res.status(404).json({ success: false, message: 'Conferência não encontrada' });
+    }
+    if (!conferencia.ds_email_tutor) {
+      return res.status(400).json({ success: false, message: 'Conferência sem e-mail do tutor' });
+    }
+
+    const [animal, vet] = await Promise.all([
+      MobAnimais.findByPk(conferencia.mob_animais_id),
+      WebVeterinarios.findByPk(conferencia.web_veterinarios_id)
+    ]);
+
+    const enviado = await enviarEmailTutor({
+      emailTutor: conferencia.ds_email_tutor,
+      nomeAnimal: animal?.no_nome || 'seu animal',
+      link: conferencia.ds_link,
+      nomeVet: vet?.no_completo || 'Veterinário'
+    });
+
+    if (enviado) {
+      res.json({ success: true, message: 'E-mail enviado com sucesso' });
+    } else {
+      res.status(500).json({ success: false, message: 'Falha ao enviar e-mail — verifique os logs do servidor' });
+    }
+  } catch (error) {
+    console.error('ERRO em POST /conferencias/:id/email:', error.message);
+    res.status(500).json({ success: false, message: 'Erro ao enviar e-mail', error: error.message });
   }
 });
 
