@@ -155,10 +155,10 @@ async function enviarEmailCobranca({ emailTutor, clienteNome, descricao, valorFo
 </html>`,
       text: `Olá, ${clienteNome}!\n\nO(a) Dr(a). ${nomeVet} enviou uma cobrança${descricao ? ` referente a ${descricao}` : ''} no valor de ${valorFormatado}.\n\nPague pelo link abaixo:\n${link}\n\nEm caso de dúvidas: suporte@cicatribio.com.br`.trim()
     });
-    return true;
+    return { ok: true };
   } catch (error) {
     console.error('Erro ao enviar email de cobrança:', error.message);
-    return false;
+    return { ok: false, error: error.message };
   }
 }
 
@@ -207,10 +207,10 @@ Em caso de dúvidas: suporte@cicatribio.com.br
       { headers: { 'Content-Type': 'application/json' } }
     );
 
-    return true;
+    return { ok: true };
   } catch (error) {
     console.error('Erro ao enviar WhatsApp de cobrança:', error.message);
-    return false;
+    return { ok: false, error: error.message };
   }
 }
 
@@ -374,7 +374,7 @@ route.post('/cobrancas/:id/email', async (req, res) => {
     const linkResultado = await criarLinkCheckout(cobranca, vet);
     if (!linkResultado.success) return res.status(400).json(linkResultado);
 
-    const enviado = await enviarEmailCobranca({
+    const resultadoEnvio = await enviarEmailCobranca({
       emailTutor: cobranca.cliente_email,
       clienteNome: cobranca.cliente_nome,
       descricao: cobranca.descricao,
@@ -383,8 +383,11 @@ route.post('/cobrancas/:id/email', async (req, res) => {
       nomeVet: vet.no_completo || 'Veterinário'
     });
 
-    if (!enviado) {
-      return res.status(500).json({ success: false, message: 'Não foi possível enviar o e-mail — verifique os logs do servidor' });
+    if (!resultadoEnvio.ok) {
+      return res.status(500).json({
+        success: false,
+        message: `Não foi possível enviar o e-mail: ${resultadoEnvio.error || 'motivo desconhecido'}`
+      });
     }
     return res.json({ success: true, message: 'E-mail enviado com sucesso', url: linkResultado.url });
   } catch (err) {
@@ -416,7 +419,7 @@ route.post('/cobrancas/:id/whatsapp', async (req, res) => {
     const linkResultado = await criarLinkCheckout(cobranca, vet);
     if (!linkResultado.success) return res.status(400).json(linkResultado);
 
-    const enviado = await enviarWhatsAppCobranca({
+    const resultadoEnvio = await enviarWhatsAppCobranca({
       telefone: nu_telefone_completo,
       clienteNome: cobranca.cliente_nome,
       descricao: cobranca.descricao,
@@ -425,8 +428,11 @@ route.post('/cobrancas/:id/whatsapp', async (req, res) => {
       nomeVet: vet.no_completo || 'Veterinário'
     });
 
-    if (!enviado) {
-      return res.status(500).json({ success: false, message: 'Falha ao enviar WhatsApp — verifique os logs do servidor' });
+    if (!resultadoEnvio.ok) {
+      return res.status(500).json({
+        success: false,
+        message: `Falha ao enviar WhatsApp: ${resultadoEnvio.error || 'motivo desconhecido'}`
+      });
     }
     return res.json({ success: true, message: 'WhatsApp enviado com sucesso', url: linkResultado.url });
   } catch (err) {
