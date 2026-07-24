@@ -299,6 +299,9 @@ route.get('/bulario/cache/:id', async (req, res) => {
     const { WebBulasCache } = require('../../models');
     const row = await WebBulasCache.findByPk(req.params.id);
     if (!row) return res.status(404).json({ message: 'Bula não encontrada no cache.' });
+    // Campos estruturados extraídos do texto (best-effort, sem deps pesadas).
+    const { extrairCampos } = require('../../utils/extrairCamposBula');
+    const campos = extrairCampos(row.texto);
     return res.json({
       id: row.id,
       nome: row.nome_produto,
@@ -308,6 +311,10 @@ route.get('/bulario/cache/:id', async (req, res) => {
       paginas: row.paginas,
       caracteres: row.caracteres,
       texto: row.texto,
+      concentracao: campos.concentracao,
+      forma: campos.forma,
+      via: campos.via,
+      posologia: campos.posologia,
     });
   } catch (err) {
     return res.status(500).json({ message: 'Erro ao ler a bula do cache: ' + err.message });
