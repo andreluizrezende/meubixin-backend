@@ -221,4 +221,41 @@ route.get('/bulario/bula-profissional', async (req, res) => {
   return res.json({ ...resultado, cache: false });
 });
 
+// GET /bulario/medicamentos?nome=X
+// Busca no catálogo dos DADOS ABERTOS da ANVISA (tabela anvisa_medicamentos) —
+// NÃO usa worker/Chrome/Cloudflare, roda na Vercel. Devolve a lista + o link
+// para abrir a bula na ANVISA (o navegador do usuário passa o Cloudflare).
+route.get('/bulario/medicamentos', async (req, res) => {
+  const { nome } = req.query;
+  if (!nome || String(nome).trim().length < 2) {
+    return res.status(400).json({ message: 'Informe ao menos 2 letras.' });
+  }
+  try {
+    const { AnvisaMedicamentos } = require('../../models');
+    const { Op, literal } = require('sequelize');
+    const termo = String(nome).trim();
+    const rows = await AnvisaMedicamentos.findAll({
+      where: { nome_produto: { [Op.like]: `%${termo}%` } },
+      order: [
+        [literal("CASE WHEN situacao_registro = 'Ativo' THEN 0 ELSE 1 END"), 'ASC'],
+        ['nome_produto', 'ASC'],
+      ],
+      limit: 30,
+    });
+    const itens = rows.map((r) => ({
+      nome: r.nome_produto,
+      principioAtivo: r.principio_ativo,
+      empresa: r.empresa,
+      registro: r.numero_registro,
+      categoria: r.categoria_regulatoria,
+      classe: r.classe_terapeutica,
+      situacao: r.situacao_registro,
+      bulaUrl: `https://consultas.anvisa.gov.br/#/bulario/q/?nomeProduto=${encodeURIComponent(r.nome_produto)}`,
+    }));
+    return res.json({ itens });
+  } catch (err) {
+    return res.status(500).json({ message: 'Erro na busca de medicamentos (dados abertos): ' + err.message });
+  }
+});
+
 module.exports = route;
