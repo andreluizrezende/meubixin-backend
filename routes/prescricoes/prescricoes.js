@@ -158,6 +158,12 @@ route.post('/prescricoes', async (req, res) => {
       const protocoloCriado = await WebProtocolos.create({
         web_anamneses_id: anamneseCriada.id,
         web_protocolos_saude_id: protocolo.web_protocolos_saude_id,
+        nome_protocolo: protocolo.nome_protocolo || null,
+        st_uso_humano: !!protocolo.st_uso_humano,
+        ds_concentracao: protocolo.ds_concentracao || null,
+        ds_forma_farmaceutica: protocolo.ds_forma_farmaceutica || null,
+        ds_quantidade: protocolo.ds_quantidade || null,
+        ds_via_administracao: protocolo.ds_via_administracao || null,
         nu_doses: protocolo.nu_doses,
         nu_intervalo_uso: protocolo.nu_intervalo_uso,
         tipo_intervalo_uso: protocolo.tipo_intervalo_uso,
@@ -318,6 +324,12 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
       const protocoloCriado = await WebProtocolos.create({
         web_anamneses_id: parseInt(anamneseId),
         web_protocolos_saude_id: protocolo.web_protocolos_saude_id,
+        nome_protocolo: protocolo.nome_protocolo || null,
+        st_uso_humano: !!protocolo.st_uso_humano,
+        ds_concentracao: protocolo.ds_concentracao || null,
+        ds_forma_farmaceutica: protocolo.ds_forma_farmaceutica || null,
+        ds_quantidade: protocolo.ds_quantidade || null,
+        ds_via_administracao: protocolo.ds_via_administracao || null,
         nu_doses: protocolo.nu_doses,
         nu_intervalo_uso: protocolo.nu_intervalo_uso,
         tipo_intervalo_uso: protocolo.tipo_intervalo_uso,
@@ -488,9 +500,9 @@ route.get('/prescricoes/:anamneseId', async (req, res) => {
 
     // Buscar protocolos
     const protocolos = await sequelize.query(`
-      SELECT 
+      SELECT
         wp.*,
-        mps.ds_protocolos_saude as nome_protocolo
+        COALESCE(wp.nome_protocolo, mps.ds_protocolos_saude) as nome_protocolo
       FROM web_protocolos wp
       LEFT JOIN web_protocolos_saude mps ON wp.web_protocolos_saude_id = mps.id
       WHERE wp.web_anamneses_id = ?
@@ -647,7 +659,8 @@ route.get('/prescricoes/animal/:animalId', async (req, res) => {
         a.dt_data_anamnese,
         a.ds_orientacoes,
         p.id AS protocolo_id,
-        ps.ds_protocolos_saude AS nome_protocolo,
+        COALESCE(p.nome_protocolo, ps.ds_protocolos_saude) AS nome_protocolo,
+        p.st_uso_humano,
         ps.web_tipo_protocolos_saude_id,
         pa.id AS agenda_id,
         pa.dt_data_aplicacao,
@@ -700,6 +713,7 @@ route.get('/prescricoes/animal/:animalId', async (req, res) => {
             tipo_intervalo_uso: row.tipo_intervalo_uso,
             ds_dosagem: row.ds_dosagem,
             st_tipo_protocolo: row.web_tipo_protocolos_saude_id,
+            st_uso_humano: !!row.st_uso_humano,
             id: row.protocolo_id,
             nome_protocolo: row.nome_protocolo || 'Protocolo não identificado',
             agendas: []
@@ -827,7 +841,7 @@ route.get('/protocolos/animal/:animalId', async (req, res) => {
     // Adicionar nome do protocolo e formatar resposta
     const protocolosFormatados = protocolos.map(protocolo => ({
       ...protocolo.dataValues,
-      nome_protocolo: protocolo.protocolo_saude?.ds_protocolos_saude || 'Protocolo não identificado',
+      nome_protocolo: protocolo.nome_protocolo || protocolo.protocolo_saude?.ds_protocolos_saude || 'Protocolo não identificado',
       agendas: protocolo.agendas || []
     }));
 
@@ -925,7 +939,7 @@ route.get('/prescricoes/:anamneseId', async (req, res) => {
       dt_data: anamnese.dt_data_anamnese,
       protocolos: anamnese.protocolos.map(protocolo => ({
         ...protocolo.dataValues,
-        nome_protocolo: protocolo.protocolo_saude?.ds_protocolos_saude || 'Protocolo não identificado'
+        nome_protocolo: protocolo.nome_protocolo || protocolo.protocolo_saude?.ds_protocolos_saude || 'Protocolo não identificado'
       })),
       agendas: agendasPorProtocolo,
       status: dosesAplicadas === totalDoses ? 'finalizada' : 'ativa',
@@ -976,7 +990,7 @@ route.get('/protocolos/anamnese/:anamneseId', async (req, res) => {
 
     const protocolosFormatados = protocolos.map(protocolo => ({
       ...protocolo.dataValues,
-      nome_protocolo: protocolo.protocolo_saude?.ds_protocolos_saude || 'Protocolo não identificado'
+      nome_protocolo: protocolo.nome_protocolo || protocolo.protocolo_saude?.ds_protocolos_saude || 'Protocolo não identificado'
     }));
 
     res.json(protocolosFormatados);
@@ -1172,7 +1186,12 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
         p.tipo_intervalo_uso,
         p.ds_dosagem,
         p.st_tipo_protocolo,
-        ps.ds_protocolos_saude AS nome_protocolo,
+        p.st_uso_humano,
+        p.ds_concentracao,
+        p.ds_forma_farmaceutica,
+        p.ds_quantidade,
+        p.ds_via_administracao,
+        COALESCE(p.nome_protocolo, ps.ds_protocolos_saude) AS nome_protocolo,
         v.no_completo,
         v.nu_crmv,
         v.ds_estado_crmv,
@@ -1250,6 +1269,11 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
       if (linha.protocolo_id && !protocolosMap[linha.protocolo_id]) {
         protocolosMap[linha.protocolo_id] = {
           nome_protocolo: linha.nome_protocolo,
+          st_uso_humano: !!linha.st_uso_humano,
+          ds_concentracao: linha.ds_concentracao || '',
+          ds_forma_farmaceutica: linha.ds_forma_farmaceutica || '',
+          ds_quantidade: linha.ds_quantidade || '',
+          ds_via_administracao: linha.ds_via_administracao || '',
           ds_dosagem: linha.ds_dosagem,
           nu_doses: linha.nu_doses,
           nu_intervalo_uso: linha.nu_intervalo_uso,

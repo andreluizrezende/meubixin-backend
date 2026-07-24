@@ -62,6 +62,7 @@ const rotaConnect = require('./routes/connect/connect')
 const rotaCobrancas = require('./routes/cobrancas/cobrancas')
 const rotaAssinatura = require('./routes/assinatura/assinatura')
 const rotaPublicoPagamento = require('./routes/publico/publico')
+const rotaBulario = require('./routes/bulario/bulario')
 
 app.use('/admin', adminRoutes);
 app.use(rotaInicial);
@@ -99,10 +100,16 @@ app.use(rotaPrescricoes);
 app.use(rotaParceiros);
 app.use(rotaAi);
 app.use(rotaConferencias);
+// Rotas SEM auth precisam ser montadas ANTES dos routers com requireAuth global
+// (connect/cobrancas/assinatura). Esses routers fazem `route.use(requireAuth)`
+// sem path e são montados sem prefixo, então o middleware roda para QUALQUER
+// requisição que os alcance — barrando (401) qualquer rota registrada depois
+// que não casou antes. /bulario/* e /publico/* são públicas, então vêm aqui.
+app.use(rotaBulario);
+app.use(rotaPublicoPagamento);
 app.use(rotaConnect);
 app.use(rotaCobrancas);
 app.use(rotaAssinatura);
-app.use(rotaPublicoPagamento);
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`running on port: ${PORT}`))

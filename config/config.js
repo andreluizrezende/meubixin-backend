@@ -1,5 +1,6 @@
 'use strict';
 
+require('dotenv').config(); // garante DEV_DB_*/PROD_DB_* ao rodar o sequelize-cli
 const mysql2 = require('mysql2');
 
 module.exports = {

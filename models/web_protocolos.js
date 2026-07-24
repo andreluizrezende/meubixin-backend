@@ -53,7 +53,23 @@ module.exports = (sequelize, DataTypes) => {
       st_tipo_protocolo: {
         type: DataTypes.INTEGER,
         allowNull: false
-      }
+      },
+      // Nome gravado direto (cobre free-text da Farmácia, sem catálogo).
+      nome_protocolo: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+      },
+      // Uso humano (1) x veterinário (0) — para exibir na receita.
+      st_uso_humano: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      // Prescrição estruturada (Grupo A) — para a receita.
+      ds_concentracao: { type: DataTypes.STRING(120), allowNull: true },
+      ds_forma_farmaceutica: { type: DataTypes.STRING(120), allowNull: true },
+      ds_quantidade: { type: DataTypes.STRING(120), allowNull: true },
+      ds_via_administracao: { type: DataTypes.STRING(120), allowNull: true }
     },
     {
       sequelize,

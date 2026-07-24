@@ -28,3 +28,6 @@ prod_dump.sql
 
 *.log
 test-db.js
+
+# perfil persistente do Chrome (crawler bulario)
+.anvisa-chrome-profile/
