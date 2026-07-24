@@ -26,6 +26,24 @@ function getAnvisa() {
 const WORKER = (process.env.ANVISA_WORKER_URL || '').replace(/\/$/, '');
 const CACHE_ON = process.env.ANVISA_NO_CACHE !== '1';
 
+// Trava anti-loop: se ANVISA_WORKER_URL aponta para o próprio backend, o proxy
+// chamaria a si mesmo (a Vercel responde HTTP 508 "Loop Detected"). Detecta e
+// devolve um erro claro em vez de entrar em loop.
+function workerEhLoop(req) {
+  try {
+    if (!WORKER) return false;
+    const wHost = new URL(WORKER).host;
+    const reqHost = req.headers['x-forwarded-host'] || req.headers.host || '';
+    return !!wHost && !!reqHost && wHost === reqHost;
+  } catch {
+    return false;
+  }
+}
+const ERRO_LOOP = {
+  message:
+    'ANVISA_WORKER_URL aponta para o próprio backend (loop). Configure a URL de um worker EXTERNO ou remova a variável.',
+};
+
 // ---- cache (lazy: só carrega o model quando o cache está ligado) ------------
 let _cacheModel; // undefined = ainda não tentou; null = indisponível
 function getCacheModel() {
@@ -112,6 +130,11 @@ async function proxyParaWorker(req, res) {
 async function obterBulaProfissional(req) {
   const { nome, expediente, idProduto, indice } = req.query;
   if (WORKER) {
+    if (workerEhLoop(req)) {
+      const e = new Error(ERRO_LOOP.message);
+      e.status = 500;
+      throw e;
+    }
     const url = WORKER + req.originalUrl;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 9000);
@@ -150,7 +173,10 @@ async function obterBulaProfissional(req) {
 route.get('/bulario/buscar', async (req, res) => {
   const { nome } = req.query;
   if (!nome) return res.status(400).json({ message: 'Parâmetro "nome" é obrigatório.' });
-  if (WORKER) return proxyParaWorker(req, res);
+  if (WORKER) {
+    if (workerEhLoop(req)) return res.status(500).json(ERRO_LOOP);
+    return proxyParaWorker(req, res);
+  }
   try {
     const { total, itens } = await getAnvisa().buscar(nome);
     const publicos = itens.map((i) => ({
