@@ -258,4 +258,60 @@ route.get('/bulario/medicamentos', async (req, res) => {
   }
 });
 
+// GET /bulario/cache?nome=X
+// Busca as bulas JÁ COLETADAS no cache local (web_bulas_cache, tipo=profissional),
+// preenchido pelo script scripts/enriquecerBulasAnvisa.js. Só metadados (sem o
+// texto, que é grande). Roda na Vercel — é apenas leitura do banco, sem Chrome.
+route.get('/bulario/cache', async (req, res) => {
+  const { nome } = req.query;
+  if (!nome || String(nome).trim().length < 2) {
+    return res.status(400).json({ message: 'Informe ao menos 2 letras.' });
+  }
+  try {
+    const { WebBulasCache } = require('../../models');
+    const { Op } = require('sequelize');
+    const termo = String(nome).trim();
+    const rows = await WebBulasCache.findAll({
+      where: { tipo: 'profissional', nome_produto: { [Op.like]: `%${termo}%` } },
+      order: [['nome_produto', 'ASC']],
+      limit: 30,
+      attributes: ['id', 'nome_produto', 'empresa', 'cnpj', 'numero_registro', 'expediente', 'paginas', 'caracteres'],
+    });
+    const itens = rows.map((r) => ({
+      id: r.id,
+      nome: r.nome_produto,
+      empresa: r.empresa,
+      cnpj: r.cnpj,
+      registro: r.numero_registro,
+      expediente: r.expediente,
+      paginas: r.paginas,
+      caracteres: r.caracteres,
+    }));
+    return res.json({ itens });
+  } catch (err) {
+    return res.status(500).json({ message: 'Erro na busca do cache de bulas: ' + err.message });
+  }
+});
+
+// GET /bulario/cache/:id — texto completo de uma bula do cache (sob demanda).
+route.get('/bulario/cache/:id', async (req, res) => {
+  try {
+    const { WebBulasCache } = require('../../models');
+    const row = await WebBulasCache.findByPk(req.params.id);
+    if (!row) return res.status(404).json({ message: 'Bula não encontrada no cache.' });
+    return res.json({
+      id: row.id,
+      nome: row.nome_produto,
+      empresa: row.empresa,
+      registro: row.numero_registro,
+      expediente: row.expediente,
+      paginas: row.paginas,
+      caracteres: row.caracteres,
+      texto: row.texto,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Erro ao ler a bula do cache: ' + err.message });
+  }
+});
+
 module.exports = route;
