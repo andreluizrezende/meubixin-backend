@@ -1,6 +1,12 @@
 const express = require('express');
 const route = express.Router();
-const anvisa = require('../../utils/anvisaBulario');
+
+// Carregado SÓ quando o crawler roda localmente (sem ANVISA_WORKER_URL). Em
+// produção (Vercel, modo proxy) isto NUNCA é chamado — evita carregar
+// puppeteer-core/pdf-parse no bundle serverless (quebra o deploy).
+function getAnvisa() {
+  return require('../../utils/anvisaBulario');
+}
 
 /*
  * Rotas do Bulário Eletrônico da ANVISA.
@@ -131,7 +137,7 @@ async function obterBulaProfissional(req) {
       clearTimeout(timer);
     }
   }
-  return anvisa.bulaProfissionalPorNome(nome, {
+  return getAnvisa().bulaProfissionalPorNome(nome, {
     expediente,
     idProduto,
     indice: indice != null ? Number(indice) : undefined,
@@ -146,7 +152,7 @@ route.get('/bulario/buscar', async (req, res) => {
   if (!nome) return res.status(400).json({ message: 'Parâmetro "nome" é obrigatório.' });
   if (WORKER) return proxyParaWorker(req, res);
   try {
-    const { total, itens } = await anvisa.buscar(nome);
+    const { total, itens } = await getAnvisa().buscar(nome);
     const publicos = itens.map((i) => ({
       idProduto: i.idProduto,
       nomeProduto: i.nomeProduto,
