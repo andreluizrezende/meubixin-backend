@@ -3,9 +3,9 @@ const { Model } = require('sequelize');
 
 // Catálogo de medicamentos dos Dados Abertos da ANVISA (busca sem crawler).
 module.exports = (sequelize, DataTypes) => {
-  class AnvisaMedicamentos extends Model {}
+  class WebAnvisaMedicamentos extends Model {}
 
-  AnvisaMedicamentos.init(
+  WebAnvisaMedicamentos.init(
     {
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true, allowNull: false },
       nome_produto: { type: DataTypes.STRING(255), allowNull: false },
@@ -20,13 +20,13 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: 'AnvisaMedicamentos',
-      tableName: 'anvisa_medicamentos',
+      modelName: 'WebAnvisaMedicamentos',
+      tableName: 'web_anvisa_medicamentos',
       timestamps: true,
       createdAt: 'createdAt',
       updatedAt: 'updatedAt',
     }
   );
 
-  return AnvisaMedicamentos;
+  return WebAnvisaMedicamentos;
 };

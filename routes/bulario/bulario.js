@@ -231,10 +231,10 @@ route.get('/bulario/medicamentos', async (req, res) => {
     return res.status(400).json({ message: 'Informe ao menos 2 letras.' });
   }
   try {
-    const { AnvisaMedicamentos } = require('../../models');
+    const { WebAnvisaMedicamentos } = require('../../models');
     const { Op, literal } = require('sequelize');
     const termo = String(nome).trim();
-    const rows = await AnvisaMedicamentos.findAll({
+    const rows = await WebAnvisaMedicamentos.findAll({
       where: { nome_produto: { [Op.like]: `%${termo}%` } },
       order: [
         [literal("CASE WHEN situacao_registro = 'Ativo' THEN 0 ELSE 1 END"), 'ASC'],

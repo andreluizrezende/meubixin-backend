@@ -12,7 +12,7 @@
 require('dotenv').config();
 const https = require('https');
 const models = require('../models');
-const { AnvisaMedicamentos, sequelize } = models;
+const { WebAnvisaMedicamentos, sequelize } = models;
 
 // A ANVISA serve uma cadeia de certificado incompleta (UNABLE_TO_VERIFY_LEAF_
 // SIGNATURE). Baixamos via https com rejectUnauthorized:false SÓ para este
@@ -113,9 +113,9 @@ function parseLinha(linha) {
 
   const LOTE = 1000;
   await sequelize.transaction(async (t) => {
-    await AnvisaMedicamentos.destroy({ where: {}, truncate: true, transaction: t });
+    await WebAnvisaMedicamentos.destroy({ where: {}, truncate: true, transaction: t });
     for (let i = 0; i < registros.length; i += LOTE) {
-      await AnvisaMedicamentos.bulkCreate(registros.slice(i, i + LOTE), { transaction: t, logging: false });
+      await WebAnvisaMedicamentos.bulkCreate(registros.slice(i, i + LOTE), { transaction: t, logging: false });
       process.stdout.write(`\r  inseridos ${Math.min(i + LOTE, registros.length)}/${registros.length}`);
     }
   });
