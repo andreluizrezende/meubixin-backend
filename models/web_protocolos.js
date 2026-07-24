@@ -47,7 +47,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false
       },
       ds_dosagem: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.TEXT,
         allowNull: false
       },
       st_tipo_protocolo: {
