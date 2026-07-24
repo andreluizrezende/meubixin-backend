@@ -31,3 +31,7 @@ test-db.js
 
 # perfil persistente do Chrome (crawler bulario)
 .anvisa-chrome-profile/
+
+# estado do enriquecimento incremental de bulas (cursor + nomes sem bula)
+.anvisa-enriquecimento-dev.json
+.anvisa-enriquecimento-prod.json
