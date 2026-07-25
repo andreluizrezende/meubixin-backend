@@ -65,6 +65,8 @@ const rotaPublicoPagamento = require('./routes/publico/publico')
 const rotaBulario = require('./routes/bulario/bulario')
 const rotaAgenda = require('./routes/agenda/agenda')
 const rotaLembretes = require('./routes/agenda/lembretes')
+const rotaRetencao = require('./routes/retencao/retencao')
+const rotaRetencaoWorker = require('./routes/retencao/retencaoWorker')
 
 app.use('/admin', adminRoutes);
 app.use(rotaInicial);
@@ -112,12 +114,14 @@ app.use(rotaPublicoPagamento);
 // Motor de lembretes: rota pública (WORKER_TOKEN), montada ANTES dos routers com
 // requireAuth global para não ser barrada por eles.
 app.use(rotaLembretes);
+app.use(rotaRetencaoWorker);
 app.use(rotaConnect);
 app.use(rotaCobrancas);
 app.use(rotaAssinatura);
 // Agenda: usa route.use(requireAuth) próprio; montada por último para não
 // interferir na cadeia (o requireAuth só roda para as rotas /agenda).
 app.use(rotaAgenda);
+app.use(rotaRetencao);
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`running on port: ${PORT}`))
