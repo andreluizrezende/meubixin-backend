@@ -63,6 +63,7 @@ const rotaCobrancas = require('./routes/cobrancas/cobrancas')
 const rotaAssinatura = require('./routes/assinatura/assinatura')
 const rotaPublicoPagamento = require('./routes/publico/publico')
 const rotaBulario = require('./routes/bulario/bulario')
+const rotaAgenda = require('./routes/agenda/agenda')
 
 app.use('/admin', adminRoutes);
 app.use(rotaInicial);
@@ -110,6 +111,9 @@ app.use(rotaPublicoPagamento);
 app.use(rotaConnect);
 app.use(rotaCobrancas);
 app.use(rotaAssinatura);
+// Agenda: usa route.use(requireAuth) próprio; montada por último para não
+// interferir na cadeia (o requireAuth só roda para as rotas /agenda).
+app.use(rotaAgenda);
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`running on port: ${PORT}`))
