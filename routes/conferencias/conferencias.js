@@ -63,7 +63,7 @@ async function enviarEmailTutor({ emailTutor, nomeAnimal, link, nomeVet }) {
       <p>Meu Bixin</p>
     </div>
     <div class="content">
-      <div class="greeting">Olá, tutor(a) de <strong>${nomeAnimal}</strong>!</div>
+      <div class="greeting">Olá, responsável de <strong>${nomeAnimal}</strong>!</div>
       <div class="message">
         O Dr(a). <strong>${nomeVet}</strong> está aguardando você em uma videochamada para consultar <strong>${nomeAnimal}</strong>.
       </div>
@@ -95,7 +95,7 @@ async function enviarEmailTutor({ emailTutor, nomeAnimal, link, nomeVet }) {
   </div>
 </body>
 </html>`,
-      text: `Olá, tutor(a) de ${nomeAnimal}!\n\nO Dr(a). ${nomeVet} está aguardando você em uma videochamada.\n\nAcesse pelo link abaixo (não precisa instalar nada):\n${link}\n\nEm caso de dúvidas: suporte@cicatribio.com.br`.trim()
+      text: `Olá, responsável de ${nomeAnimal}!\n\nO Dr(a). ${nomeVet} está aguardando você em uma videochamada.\n\nAcesse pelo link abaixo (não precisa instalar nada):\n${link}\n\nEm caso de dúvidas: suporte@cicatribio.com.br`.trim()
     });
     return true;
   } catch (error) {
@@ -330,7 +330,7 @@ route.post('/conferencias/:id/email', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Conferência não encontrada' });
     }
     if (!conferencia.ds_email_tutor) {
-      return res.status(400).json({ success: false, message: 'Conferência sem e-mail do tutor' });
+      return res.status(400).json({ success: false, message: 'Conferência sem e-mail do responsável' });
     }
 
     const [animal, vet] = await Promise.all([

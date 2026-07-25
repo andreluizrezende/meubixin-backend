@@ -65,7 +65,7 @@ route.get('/animais/completo', async (req, res) => {
         updatedAt: a.updatedAt,
         // Campos extras esperados pelo AnimalCard
         avatar: a.no_nome?.charAt(0)?.toUpperCase() || '?',
-        proprietario: tutor?.no_completo || 'Tutor não informado',
+        proprietario: tutor?.no_completo || 'Responsável não informado',
         email: tutor?.ds_email || 'Email não informado',
         telefone: tutor?.nu_telefone_completo || 'Telefone não informado',
         documento: tutor?.nu_cpf ? String(tutor.nu_cpf) : ''
