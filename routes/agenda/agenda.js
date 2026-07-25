@@ -28,6 +28,35 @@ function camposEditaveis(body) {
   return out;
 }
 
+// GET /agenda/pacientes — animais do VET LOGADO (associação por CRMV), já com os
+// contatos do responsável e a data da última consulta (web_anamneses) feita por
+// este veterinário. Scoped por req.vetId (nunca por parâmetro do cliente).
+route.get('/agenda/pacientes', async (req, res) => {
+  try {
+    const linhas = await sequelize.query(
+      `SELECT a.id, a.no_nome, a.ds_especie, a.mob_tutores_id,
+              t.no_completo            AS responsavel_nome,
+              t.ds_email               AS responsavel_email,
+              t.nu_telefone_completo   AS responsavel_telefone,
+              (SELECT MAX(COALESCE(an.dt_data_anamnese, an.createdAt))
+                 FROM web_anamneses an
+                WHERE an.mob_animais_id = a.id
+                  AND an.web_veterinarios_id = :vetId) AS ultima_consulta
+         FROM mob_animais a
+         JOIN mob_veterinarios v ON v.id = a.mob_veterinarios_id
+         JOIN web_veterinarios wv ON wv.id = :vetId
+         LEFT JOIN mob_tutores t ON t.id = a.mob_tutores_id
+        WHERE v.nu_crmv = wv.nu_crmv
+          AND v.ds_estado_crmv = wv.ds_estado_crmv
+        ORDER BY a.no_nome ASC`,
+      { replacements: { vetId: req.vetId }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, itens: linhas });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao listar pacientes: ' + err.message });
+  }
+});
+
 // GET /agenda?de=YYYY-MM-DD&ate=YYYY-MM-DD  — lista os agendamentos do vet no
 // intervalo (para o calendário). Inclui nome/espécie do animal e o responsável.
 route.get('/agenda', async (req, res) => {
