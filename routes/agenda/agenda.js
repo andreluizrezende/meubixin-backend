@@ -5,6 +5,7 @@ const { QueryTypes } = require('sequelize');
 const models = require('../../models');
 const { WebAgendamentos, WebLembretes, sequelize } = models;
 const requireAuth = require('../../middleware/requireAuth');
+const { processarLembretes } = require('../../utils/processarLembretes');
 // ---- Lembretes (Fase 2): GERAÇÃO das linhas. O MOTOR de disparo fica em
 // routes/agenda/lembretes.js (rota pública via WORKER_TOKEN, montada ANTES dos
 // routers com requireAuth global). Regras fixas (MVP): 24h e 2h antes.
@@ -13,20 +14,28 @@ const REGRAS_LEMBRETE = [
   { tp: 'lembrete_2h', ms: 2 * 3600 * 1000 },
 ];
 
-// Gera as linhas de web_lembretes para um agendamento (só as que ainda são futuras).
+// Gera as linhas de web_lembretes para um agendamento futuro. Regras 24h/2h antes
+// que ainda são futuras viram lembretes agendados; se o agendamento é IMINENTE
+// (a menos da menor antecedência), cria um único lembrete IMEDIATO por canal —
+// melhor avisar tarde do que não avisar (e permite validar na hora).
 async function gerarLembretes(ag) {
   const inicio = new Date(ag.dt_inicio).getTime();
   const agora = Date.now();
+  if (inicio <= agora) return; // agendamento no passado → nada
   const canais = [];
   if (ag.ds_email_responsavel) canais.push('email');
   if (ag.nu_telefone_responsavel) canais.push('whatsapp');
   if (!canais.length) return;
+  const futuras = REGRAS_LEMBRETE.filter((r) => inicio - r.ms > agora);
   const linhas = [];
-  for (const r of REGRAS_LEMBRETE) {
-    const quando = inicio - r.ms;
-    if (quando <= agora) continue; // já passou → não cria
-    for (const canal of canais) {
-      linhas.push({ web_agendamentos_id: ag.id, tp_lembrete: r.tp, canal, dt_agendado_para: new Date(quando), st_status: 'pendente' });
+  for (const canal of canais) {
+    if (futuras.length) {
+      for (const r of futuras) {
+        linhas.push({ web_agendamentos_id: ag.id, tp_lembrete: r.tp, canal, dt_agendado_para: new Date(inicio - r.ms), st_status: 'pendente' });
+      }
+    } else {
+      // iminente: um lembrete para disparar já
+      linhas.push({ web_agendamentos_id: ag.id, tp_lembrete: 'lembrete_2h', canal, dt_agendado_para: new Date(agora), st_status: 'pendente' });
     }
   }
   if (linhas.length) await WebLembretes.bulkCreate(linhas);
@@ -84,6 +93,39 @@ route.get('/agenda/pacientes', async (req, res) => {
     return res.json({ success: true, itens: linhas });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao listar pacientes: ' + err.message });
+  }
+});
+
+// GET /agenda/lembretes — fila de lembretes dos agendamentos DESTE vet (tela
+// temporária de validação). Registrada antes de /agenda/:id para não colidir.
+route.get('/agenda/lembretes', async (req, res) => {
+  try {
+    const linhas = await sequelize.query(
+      `SELECT l.id, l.tp_lembrete, l.canal, l.dt_agendado_para, l.dt_enviado, l.st_status, l.ds_erro,
+              a.dt_inicio, a.tp_agendamento, an.no_nome AS animal_nome,
+              a.ds_email_responsavel, a.nu_telefone_responsavel
+         FROM web_lembretes l
+         JOIN web_agendamentos a ON a.id = l.web_agendamentos_id
+         JOIN mob_animais an ON an.id = a.mob_animais_id
+        WHERE a.web_veterinarios_id = :vetId
+        ORDER BY l.dt_agendado_para DESC
+        LIMIT 100`,
+      { replacements: { vetId: req.vetId }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, itens: linhas });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao listar lembretes: ' + err.message });
+  }
+});
+
+// POST /agenda/lembretes/disparar — disparo MANUAL (tela temporária). Processa só
+// os lembretes vencidos deste vet, usando a sessão (sem expor o WORKER_TOKEN).
+route.post('/agenda/lembretes/disparar', async (req, res) => {
+  try {
+    const r = await processarLembretes({ limite: req.body && req.body.limite, vetId: req.vetId });
+    return res.json({ success: true, ...r });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao disparar lembretes: ' + err.message });
   }
 });
 
