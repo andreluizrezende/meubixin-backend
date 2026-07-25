@@ -64,6 +64,7 @@ const rotaAssinatura = require('./routes/assinatura/assinatura')
 const rotaPublicoPagamento = require('./routes/publico/publico')
 const rotaBulario = require('./routes/bulario/bulario')
 const rotaAgenda = require('./routes/agenda/agenda')
+const rotaLembretes = require('./routes/agenda/lembretes')
 
 app.use('/admin', adminRoutes);
 app.use(rotaInicial);
@@ -108,6 +109,9 @@ app.use(rotaConferencias);
 // que não casou antes. /bulario/* e /publico/* são públicas, então vêm aqui.
 app.use(rotaBulario);
 app.use(rotaPublicoPagamento);
+// Motor de lembretes: rota pública (WORKER_TOKEN), montada ANTES dos routers com
+// requireAuth global para não ser barrada por eles.
+app.use(rotaLembretes);
 app.use(rotaConnect);
 app.use(rotaCobrancas);
 app.use(rotaAssinatura);

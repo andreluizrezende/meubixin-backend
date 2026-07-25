@@ -3,10 +3,40 @@ const express = require('express');
 const route = express.Router();
 const { QueryTypes } = require('sequelize');
 const models = require('../../models');
-const { WebAgendamentos, sequelize } = models;
+const { WebAgendamentos, WebLembretes, sequelize } = models;
 const requireAuth = require('../../middleware/requireAuth');
+// ---- Lembretes (Fase 2): GERAÇÃO das linhas. O MOTOR de disparo fica em
+// routes/agenda/lembretes.js (rota pública via WORKER_TOKEN, montada ANTES dos
+// routers com requireAuth global). Regras fixas (MVP): 24h e 2h antes.
+const REGRAS_LEMBRETE = [
+  { tp: 'lembrete_24h', ms: 24 * 3600 * 1000 },
+  { tp: 'lembrete_2h', ms: 2 * 3600 * 1000 },
+];
 
-// Todas as rotas da agenda exigem autenticação — a identidade é SEMPRE req.vetId
+// Gera as linhas de web_lembretes para um agendamento (só as que ainda são futuras).
+async function gerarLembretes(ag) {
+  const inicio = new Date(ag.dt_inicio).getTime();
+  const agora = Date.now();
+  const canais = [];
+  if (ag.ds_email_responsavel) canais.push('email');
+  if (ag.nu_telefone_responsavel) canais.push('whatsapp');
+  if (!canais.length) return;
+  const linhas = [];
+  for (const r of REGRAS_LEMBRETE) {
+    const quando = inicio - r.ms;
+    if (quando <= agora) continue; // já passou → não cria
+    for (const canal of canais) {
+      linhas.push({ web_agendamentos_id: ag.id, tp_lembrete: r.tp, canal, dt_agendado_para: new Date(quando), st_status: 'pendente' });
+    }
+  }
+  if (linhas.length) await WebLembretes.bulkCreate(linhas);
+}
+
+async function cancelarLembretesPendentes(agId) {
+  await WebLembretes.update({ st_status: 'cancelado' }, { where: { web_agendamentos_id: agId, st_status: 'pendente' } });
+}
+
+// Todas as rotas ABAIXO exigem autenticação — a identidade é SEMPRE req.vetId
 // (nunca um vetId vindo do corpo/query). Ver gotcha de montagem no index.js:
 // este router é montado por ÚLTIMO, depois de connect/cobrancas/assinatura.
 route.use(requireAuth);
@@ -114,7 +144,7 @@ route.post('/agenda', async (req, res) => {
       ds_observacoes: dados.ds_observacoes || null,
       ds_status: 'agendado',
     });
-    // TODO (Fase 2): gerar linhas em web_lembretes (24h/2h antes) a partir de dt_inicio.
+    try { await gerarLembretes(ag); } catch (e) { console.error('gerarLembretes (create):', e.message); }
     return res.status(201).json({ success: true, agendamento: ag });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao criar o agendamento: ' + err.message });
@@ -127,7 +157,8 @@ route.put('/agenda/:id', async (req, res) => {
     const ag = await WebAgendamentos.findOne({ where: { id: req.params.id, web_veterinarios_id: req.vetId } });
     if (!ag) return res.status(404).json({ success: false, message: 'Agendamento não encontrado.' });
     await ag.update(camposEditaveis(req.body));
-    // TODO (Fase 2): recalcular os lembretes pendentes se dt_inicio mudou.
+    // Remarcou/editou → recria os lembretes pendentes com a data nova.
+    try { await cancelarLembretesPendentes(ag.id); await gerarLembretes(ag); } catch (e) { console.error('gerarLembretes (update):', e.message); }
     return res.json({ success: true, agendamento: ag });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao atualizar o agendamento: ' + err.message });
@@ -144,6 +175,10 @@ route.patch('/agenda/:id/status', async (req, res) => {
     const ag = await WebAgendamentos.findOne({ where: { id: req.params.id, web_veterinarios_id: req.vetId } });
     if (!ag) return res.status(404).json({ success: false, message: 'Agendamento não encontrado.' });
     await ag.update({ ds_status });
+    // Cancelado/concluído → não faz sentido lembrar; cancela os pendentes.
+    if (['cancelado', 'concluido'].includes(ds_status)) {
+      try { await cancelarLembretesPendentes(ag.id); } catch (e) { console.error('cancelarLembretes:', e.message); }
+    }
     return res.json({ success: true, agendamento: ag });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao mudar o status: ' + err.message });
@@ -170,6 +205,7 @@ route.post('/agenda/:id/retorno', async (req, res) => {
       ds_observacoes: req.body.ds_observacoes || null,
       ds_status: 'agendado',
     });
+    try { await gerarLembretes(ret); } catch (e) { console.error('gerarLembretes (retorno):', e.message); }
     return res.status(201).json({ success: true, agendamento: ret });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao criar o retorno: ' + err.message });
