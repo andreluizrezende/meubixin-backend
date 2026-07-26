@@ -56,24 +56,33 @@ function ehErroTransitorio(e) {
 }
 
 // ---- localizar o Chrome instalado (Windows / Linux / macOS) -----------------
-function acharChrome() {
-  if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) {
-    return process.env.CHROME_PATH;
-  }
+// Lista os navegadores existentes, em ordem de preferência. Retorna TODOS os que
+// existem (não só o primeiro) para o getBrowser poder cair pro próximo se um
+// falhar ao lançar — em algumas máquinas o chrome.exe dá EACCES no spawn (bloqueio
+// de execução), mas o Edge (também Chromium) funciona.
+function acharChromes() {
   const candidatos = [
+    process.env.CHROME_PATH || null,
     'C:/Program Files/Google/Chrome/Application/chrome.exe',
     'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
     process.env.LOCALAPPDATA
       ? path.join(process.env.LOCALAPPDATA, 'Google/Chrome/Application/chrome.exe')
       : null,
     'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+    'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
     '/usr/bin/google-chrome',
     '/usr/bin/google-chrome-stable',
     '/usr/bin/chromium-browser',
     '/usr/bin/chromium',
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   ].filter(Boolean);
-  return candidatos.find((p) => fs.existsSync(p)) || null;
+  // dedup preservando ordem, só os que existem
+  const vistos = new Set();
+  return candidatos.filter((p) => {
+    if (vistos.has(p) || !fs.existsSync(p)) return false;
+    vistos.add(p);
+    return true;
+  });
 }
 
 // ---- navegador único (quente) + acesso serializado --------------------------
@@ -108,12 +117,11 @@ async function getBrowser() {
     browserPromise = null; // navegador morto → esquece e relança
   }
   browserPromise = (async () => {
-    const executablePath = acharChrome();
-    if (!executablePath) {
-      throw new Error('Chrome não encontrado. Defina CHROME_PATH apontando para o executável do Chrome/Chromium.');
+    const navegadores = acharChromes();
+    if (!navegadores.length) {
+      throw new Error('Nenhum Chrome/Edge encontrado. Defina CHROME_PATH apontando para o executável do Chrome/Chromium.');
     }
-    return puppeteer.launch({
-      executablePath,
+    const opts = {
       headless: HEADLESS ? 'new' : false,
       userDataDir: PERFIL_DIR,
       defaultViewport: null,
@@ -124,7 +132,20 @@ async function getBrowser() {
         '--disable-features=IsolateOrigins,site-per-process',
         '--start-maximized',
       ],
-    });
+    };
+    let ultimoErro;
+    for (const executablePath of navegadores) {
+      try {
+        return await puppeteer.launch({ ...opts, executablePath });
+      } catch (e) {
+        ultimoErro = e;
+        const m = String((e && e.message) || e);
+        // EACCES/ENOENT no spawn → tenta o próximo navegador (ex.: Chrome bloqueado → Edge)
+        if (!/spawn|EACCES|ENOENT|Failed to launch/i.test(m)) throw e;
+        console.warn(`[anvisa] falha ao lançar ${executablePath} (${m.slice(0, 60)}). Tentando o próximo...`);
+      }
+    }
+    throw ultimoErro || new Error('Não foi possível lançar nenhum navegador.');
   })();
   browserPromise.catch(() => { browserPromise = null; });
   return browserPromise;
