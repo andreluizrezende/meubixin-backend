@@ -34,16 +34,9 @@ const BASE_SQL = `
     LEFT JOIN web_pet_perfil pp ON pp.mob_animais_id = ani.id
    WHERE v.nu_crmv = wv.nu_crmv AND v.ds_estado_crmv = wv.ds_estado_crmv`;
 
-const VACINA_SQL = `
-  SELECT ag.id AS agenda_id, p.nome_protocolo, ani.id AS mob_animais_id, ani.no_nome AS animal_nome,
-         t.id AS mob_tutores_id, t.no_completo AS responsavel_nome, t.ds_email AS email, t.nu_telefone_completo AS telefone
-    FROM web_protocolos_agendas ag
-    JOIN web_protocolos p ON p.id = ag.web_protocolos_id
-    JOIN web_anamneses an ON an.id = p.web_anamneses_id
-    JOIN mob_animais ani ON ani.id = an.mob_animais_id
-    LEFT JOIN mob_tutores t ON t.id = ani.mob_tutores_id
-   WHERE an.web_veterinarios_id = :vetId AND p.st_tipo_protocolo = 0 AND ag.st_concluido = 0
-     AND ag.dt_data_aplicacao BETWEEN DATE_SUB(NOW(), INTERVAL 30 DAY) AND DATE_ADD(NOW(), INTERVAL 15 DAY)`;
+// NOTA: os lembretes de DOSE (vacina/vermífugo/medicamento) NÃO ficam mais aqui —
+// migraram para o motor de lembretes (utils/processarLembretes.js → gerarLembretesDose),
+// exibidos na tela de Lembretes. Retenção cobre só inativo/aniversário/check-up/pós.
 
 const POS_SQL = `
   SELECT a.id AS agendamento_id, ani.id AS mob_animais_id, ani.no_nome AS animal_nome,
@@ -58,11 +51,10 @@ async function gerarGatilhos({ vetId }) {
   if (!vetId) throw new Error('vetId é obrigatório');
   const agora = new Date();
   const base = await sequelize.query(BASE_SQL, { replacements: { vetId }, type: QueryTypes.SELECT });
-  const vac = await sequelize.query(VACINA_SQL, { replacements: { vetId }, type: QueryTypes.SELECT });
   const pos = await sequelize.query(POS_SQL, { replacements: { vetId }, type: QueryTypes.SELECT });
 
   // consentimento por tutor
-  const tutorIds = [...new Set([...base, ...vac, ...pos].map((r) => r.mob_tutores_id).filter(Boolean))];
+  const tutorIds = [...new Set([...base, ...pos].map((r) => r.mob_tutores_id).filter(Boolean))];
   const consMap = {};
   if (tutorIds.length) {
     const cons = await WebConsentimento.findAll({ where: { mob_tutores_id: tutorIds } });
@@ -85,7 +77,6 @@ async function gerarGatilhos({ vetId }) {
       candidatos.push({ ...b, tp_gatilho: 'checkup_idoso', ds_titulo: null, ref: `checkup:${b.mob_animais_id}:${semestre(agora)}` });
     }
   }
-  for (const v of vac) candidatos.push({ ...v, tp_gatilho: 'vacina_vencendo', ds_titulo: v.nome_protocolo, ref: `vacina:${v.agenda_id}` });
   for (const p of pos) candidatos.push({ ...p, tp_gatilho: 'pos_atendimento', ds_titulo: null, ref: `posatend:${p.agendamento_id}` });
 
   const linhas = [];
@@ -138,11 +129,6 @@ function montarMensagem(row) {
   const vet = row.vet_nome || 'sua clínica';
   let assunto, corpoHtml, textoWhats;
   switch (row.tp_gatilho) {
-    case 'vacina_vencendo':
-      assunto = `Vacina do ${animal} próxima do vencimento`;
-      corpoHtml = `<p>Olá, <strong>${nome}</strong>!</p><p>A vacina <strong>${row.ds_titulo || ''}</strong> do <strong>${animal}</strong> está próxima do vencimento. Manter a vacinação em dia protege a saúde dele. Vamos agendar?</p>`;
-      textoWhats = `🐾 *${vet}*\n\nOlá, *${nome}*! A vacina *${row.ds_titulo || ''}* do *${animal}* está próxima do vencimento. Manter em dia protege a saúde dele — vamos agendar? 💉`;
-      break;
     case 'inativo':
       assunto = `Sentimos falta do ${animal}!`;
       corpoHtml = `<p>Olá, <strong>${nome}</strong>!</p><p>Faz um tempinho que não vemos o <strong>${animal}</strong> por aqui. Que tal um check-up para garantir que está tudo bem?</p>`;

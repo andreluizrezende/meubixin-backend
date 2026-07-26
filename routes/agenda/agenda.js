@@ -5,7 +5,7 @@ const { QueryTypes } = require('sequelize');
 const models = require('../../models');
 const { WebAgendamentos, WebLembretes, sequelize } = models;
 const requireAuth = require('../../middleware/requireAuth');
-const { processarLembretes } = require('../../utils/processarLembretes');
+const { processarLembretes, gerarLembretesDose } = require('../../utils/processarLembretes');
 // ---- Lembretes (Fase 2): GERAÇÃO das linhas. O MOTOR de disparo fica em
 // routes/agenda/lembretes.js (rota pública via WORKER_TOKEN, montada ANTES dos
 // routers com requireAuth global). Regras fixas (MVP): 24h e 2h antes.
@@ -101,15 +101,20 @@ route.get('/agenda/pacientes', async (req, res) => {
 route.get('/agenda/lembretes', async (req, res) => {
   try {
     const linhas = await sequelize.query(
-      `SELECT l.id, l.tp_lembrete, l.canal, l.dt_agendado_para, l.dt_enviado, l.st_status, l.ds_erro,
-              a.dt_inicio, a.tp_agendamento, an.no_nome AS animal_nome,
-              a.ds_email_responsavel, a.nu_telefone_responsavel
+      `SELECT l.id, l.tp_lembrete, l.tp_origem, l.canal, l.dt_agendado_para, l.dt_enviado, l.st_status, l.ds_erro,
+              a.dt_inicio, a.tp_agendamento,
+              COALESCE(a.ds_titulo, l.ds_titulo) AS ds_titulo,
+              an.no_nome AS animal_nome,
+              COALESCE(a.ds_email_responsavel, t.ds_email) AS ds_email_responsavel,
+              COALESCE(a.nu_telefone_responsavel, t.nu_telefone_completo) AS nu_telefone_responsavel
          FROM web_lembretes l
-         JOIN web_agendamentos a ON a.id = l.web_agendamentos_id
-         JOIN mob_animais an ON an.id = a.mob_animais_id
-        WHERE a.web_veterinarios_id = :vetId
-        ORDER BY l.dt_agendado_para DESC
-        LIMIT 100`,
+         LEFT JOIN web_agendamentos a ON a.id = l.web_agendamentos_id
+         LEFT JOIN mob_animais an ON an.id = COALESCE(a.mob_animais_id, l.mob_animais_id)
+         LEFT JOIN mob_tutores t ON t.id = an.mob_tutores_id
+        WHERE COALESCE(a.web_veterinarios_id, l.web_veterinarios_id) = :vetId
+        ORDER BY (CASE WHEN l.st_status = 'pendente' THEN 0 ELSE 1 END) ASC,
+                 l.dt_agendado_para ASC, l.id ASC
+        LIMIT 200`,
       { replacements: { vetId: req.vetId }, type: QueryTypes.SELECT }
     );
     return res.json({ success: true, itens: linhas });
@@ -126,6 +131,17 @@ route.post('/agenda/lembretes/disparar', async (req, res) => {
     return res.json({ success: true, ...r });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao disparar lembretes: ' + err.message });
+  }
+});
+
+// POST /agenda/lembretes/gerar-doses — gera lembretes de dose (vacina/vermífugo
+// vencendo + medicamento do dia) para este vet. Idempotente (dedup por ds_ref).
+route.post('/agenda/lembretes/gerar-doses', async (req, res) => {
+  try {
+    const r = await gerarLembretesDose({ vetId: req.vetId });
+    return res.json({ success: true, ...r });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao gerar lembretes de dose: ' + err.message });
   }
 });
 
