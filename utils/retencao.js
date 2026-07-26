@@ -110,6 +110,111 @@ async function gerarGatilhos({ vetId }) {
   return { candidatos: candidatos.length, gerados: criados };
 }
 
+// ---- Construtor de campanhas (tela "Criar gatilho") ----
+
+// Seleciona o público de UM tipo de gatilho (sem consentimento ainda).
+async function candidatosPorTipo({ vetId, tp }) {
+  if (!vetId) throw new Error('vetId é obrigatório');
+  const agora = new Date();
+  if (tp === 'pos_atendimento') {
+    const pos = await sequelize.query(POS_SQL, { replacements: { vetId }, type: QueryTypes.SELECT });
+    return pos.map((p) => ({ ...p, ref: `posatend:${p.agendamento_id}` }));
+  }
+  const base = await sequelize.query(BASE_SQL, { replacements: { vetId }, type: QueryTypes.SELECT });
+  const amanha = new Date(agora.getTime() + 86400000);
+  const out = [];
+  for (const b of base) {
+    const ultima = b.ultima_consulta ? new Date(b.ultima_consulta) : null;
+    const dias = ultima ? (agora - ultima) / 86400000 : Infinity;
+    if (tp === 'inativo') {
+      if (dias >= 90) out.push({ ...b, ref: `inativo:${b.mob_animais_id}:${ym(agora)}` });
+    } else if (tp === 'aniversario') {
+      if (b.dt_nascimento) {
+        const d = new Date(b.dt_nascimento);
+        const hoje = d.getUTCMonth() === agora.getMonth() && d.getUTCDate() === agora.getDate();
+        const proximo = d.getUTCMonth() === amanha.getMonth() && d.getUTCDate() === amanha.getDate();
+        if (hoje || proximo) out.push({ ...b, ref: `aniversario:${b.mob_animais_id}:${agora.getFullYear()}` });
+      }
+    } else if (tp === 'checkup_idoso') {
+      const idade = b.dt_nascimento ? Math.floor((agora - new Date(b.dt_nascimento)) / (365.25 * 86400000)) : (Number(b.vl_idade) || 0);
+      if (idade >= IDADE_IDOSO && dias >= 180) out.push({ ...b, ref: `checkup:${b.mob_animais_id}:${semestre(agora)}` });
+    }
+  }
+  return out;
+}
+
+async function mapaConsentimento(cands) {
+  const tutorIds = [...new Set(cands.map((c) => c.mob_tutores_id).filter(Boolean))];
+  const consMap = {};
+  if (tutorIds.length) {
+    const cons = await WebConsentimento.findAll({ where: { mob_tutores_id: tutorIds } });
+    cons.forEach((c) => { consMap[c.mob_tutores_id] = c; });
+  }
+  return consMap;
+}
+
+// Canais permitidos para o candidato (respeita consentimento).
+function canaisPermitidos(c, tp, consMap) {
+  const cons = consMap[c.mob_tutores_id];
+  if (MARKETING.has(tp) && cons && cons.st_marketing === 0) return [];
+  const canais = [];
+  if (c.email && (!cons || cons.st_email !== 0)) canais.push('email');
+  if (c.telefone && (!cons || cons.st_whatsapp !== 0)) canais.push('whatsapp');
+  return canais;
+}
+
+// Mensagem padrão (editável na tela) por tipo. Placeholders: {animal}, {responsavel}.
+function mensagemPadrao(tp) {
+  switch (tp) {
+    case 'inativo': return 'Olá, {responsavel}! Faz um tempo que não vemos o {animal} por aqui. Que tal agendar um check-up para garantir que está tudo bem? 💚';
+    case 'aniversario': return 'Olá, {responsavel}! Amanhã é aniversário do {animal}! 🎂 Desejamos muita saúde e alegria. Conte com a gente para cuidar dele. 🐾';
+    case 'checkup_idoso': return 'Olá, {responsavel}! O {animal} já está na fase sênior — recomendamos um check-up semestral para detectar cedo qualquer alteração. Vamos agendar? 🩺';
+    case 'pos_atendimento': return 'Olá, {responsavel}! Como o {animal} está após o atendimento? Sua opinião é muito importante — conte pra gente como foi sua experiência. 🙏';
+    default: return 'Olá, {responsavel}! Temos novidades sobre o {animal}.';
+  }
+}
+
+// Prévia: quantas pessoas seriam contatadas + amostra + mensagem padrão sugerida.
+async function previewGatilho({ vetId, tp }) {
+  const cands = await candidatosPorTipo({ vetId, tp });
+  const consMap = await mapaConsentimento(cands);
+  const elegiveis = cands.filter((c) => canaisPermitidos(c, tp, consMap).length > 0);
+  return {
+    total: elegiveis.length,
+    amostra: elegiveis.slice(0, 10).map((c) => ({ animal_nome: c.animal_nome, responsavel_nome: c.responsavel_nome })),
+    mensagemPadrao: mensagemPadrao(tp),
+  };
+}
+
+// Cria a campanha de UM gatilho com a mensagem informada (renderizada por destinatário).
+async function gerarGatilho({ vetId, tp, mensagem }) {
+  const cands = await candidatosPorTipo({ vetId, tp });
+  const consMap = await mapaConsentimento(cands);
+  const render = (txt, c) => String(txt || '')
+    .replace(/\{animal\}/gi, c.animal_nome || 'seu pet')
+    .replace(/\{respons[aá]vel\}|\{tutor\}/gi, c.responsavel_nome || 'responsável');
+  const agora = new Date();
+  const linhas = [];
+  for (const c of cands) {
+    const canais = canaisPermitidos(c, tp, consMap);
+    const msg = mensagem && mensagem.trim() ? render(mensagem, c) : null;
+    for (const canal of canais) {
+      linhas.push({
+        web_veterinarios_id: vetId, mob_animais_id: c.mob_animais_id, mob_tutores_id: c.mob_tutores_id || null,
+        tp_gatilho: tp, canal, ds_titulo: null, ds_mensagem: msg,
+        dt_agendado_para: agora, st_status: 'pendente', ds_chave_dedup: `${c.ref}:${canal}`,
+      });
+    }
+  }
+  let gerados = 0;
+  if (linhas.length) {
+    const antes = await WebCampanhaEnvios.count({ where: { web_veterinarios_id: vetId } });
+    await WebCampanhaEnvios.bulkCreate(linhas, { ignoreDuplicates: true });
+    gerados = (await WebCampanhaEnvios.count({ where: { web_veterinarios_id: vetId } })) - antes;
+  }
+  return { candidatos: cands.length, gerados };
+}
+
 // ---- mensagens por gatilho ----
 function wrapEmail(titulo, corpo) {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"></head>
@@ -162,7 +267,7 @@ async function processarCampanhas({ vetId, limite = 50 } = {}) {
   const lim = Math.min(Number(limite) || 50, 200);
   const filtroVet = vetId ? 'AND ce.web_veterinarios_id = :vetId' : '';
   const pend = await sequelize.query(
-    `SELECT ce.id AS envio_id, ce.tp_gatilho, ce.canal, ce.ds_titulo, ce.mob_animais_id,
+    `SELECT ce.id AS envio_id, ce.tp_gatilho, ce.canal, ce.ds_titulo, ce.ds_mensagem, ce.mob_animais_id,
             ani.no_nome AS animal_nome, t.no_completo AS responsavel_nome,
             t.ds_email AS email, t.nu_telefone_completo AS telefone, wv.no_completo AS vet_nome
        FROM web_campanha_envios ce
@@ -181,7 +286,19 @@ async function processarCampanhas({ vetId, limite = 50 } = {}) {
       { where: { id: row.envio_id, st_status: 'pendente' } }
     );
     if (!claimed) { pulados++; continue; }
-    const msg = montarMensagem(row);
+    // mensagem personalizada (construtor de campanhas) tem prioridade
+    let msg;
+    if (row.ds_mensagem && row.ds_mensagem.trim()) {
+      const assunto = `Mensagem de ${row.vet_nome || 'sua clínica'}`;
+      msg = {
+        assunto,
+        html: wrapEmail(assunto, `<p>${row.ds_mensagem.replace(/\n/g, '<br>')}</p>`),
+        textoEmail: row.ds_mensagem,
+        textoWhats: `${row.ds_mensagem}\n\n---\n_Meu Bixin_`,
+      };
+    } else {
+      msg = montarMensagem(row);
+    }
     let ok = false;
     if (row.canal === 'email') ok = await enviarEmail({ para: row.email, assunto: msg.assunto, html: msg.html, texto: msg.textoEmail });
     else if (row.canal === 'whatsapp') ok = await enviarWhatsApp({ telefone: row.telefone, texto: msg.textoWhats });
@@ -191,4 +308,4 @@ async function processarCampanhas({ vetId, limite = 50 } = {}) {
   return { processados: pend.length, enviados, erros, pulados };
 }
 
-module.exports = { gerarGatilhos, processarCampanhas, montarMensagem };
+module.exports = { gerarGatilhos, processarCampanhas, montarMensagem, previewGatilho, gerarGatilho, mensagemPadrao };

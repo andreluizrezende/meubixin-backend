@@ -5,7 +5,9 @@ const { QueryTypes } = require('sequelize');
 const models = require('../../models');
 const { WebPetPerfil, WebConsentimento, sequelize } = models;
 const requireAuth = require('../../middleware/requireAuth');
-const { gerarGatilhos, processarCampanhas } = require('../../utils/retencao');
+const { gerarGatilhos, processarCampanhas, previewGatilho, gerarGatilho } = require('../../utils/retencao');
+
+const TIPOS_GATILHO = ['inativo', 'aniversario', 'checkup_idoso', 'pos_atendimento'];
 
 // Todas exigem sessão; identidade = req.vetId. Montado por ÚLTIMO no index.js.
 route.use(requireAuth);
@@ -43,6 +45,35 @@ route.post('/retencao/gerar', async (req, res) => {
   }
 });
 
+// GET /retencao/preview?tp=... — prévia do público de um gatilho (total + amostra
+// + mensagem padrão sugerida) para o construtor de campanhas.
+route.get('/retencao/preview', async (req, res) => {
+  try {
+    const tp = String(req.query.tp || '');
+    if (!TIPOS_GATILHO.includes(tp)) {
+      return res.status(400).json({ success: false, message: 'Tipo de gatilho inválido. Use: ' + TIPOS_GATILHO.join(', ') });
+    }
+    const r = await previewGatilho({ vetId: req.vetId, tp });
+    return res.json({ success: true, ...r });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro na prévia: ' + err.message });
+  }
+});
+
+// POST /retencao/gatilho — cria a campanha de UM gatilho com a mensagem informada.
+route.post('/retencao/gatilho', async (req, res) => {
+  try {
+    const { tp_gatilho, mensagem } = req.body || {};
+    if (!TIPOS_GATILHO.includes(tp_gatilho)) {
+      return res.status(400).json({ success: false, message: 'Tipo de gatilho inválido.' });
+    }
+    const r = await gerarGatilho({ vetId: req.vetId, tp: tp_gatilho, mensagem });
+    return res.json({ success: true, ...r });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao criar gatilho: ' + err.message });
+  }
+});
+
 // POST /retencao/disparar — envia os pendentes vencidos deste vet (disparo manual).
 route.post('/retencao/disparar', async (req, res) => {
   try {
@@ -67,11 +98,12 @@ route.get('/retencao/pet-perfil/:animalId', async (req, res) => {
 route.put('/retencao/pet-perfil/:animalId', async (req, res) => {
   try {
     const mob_animais_id = Number(req.params.animalId);
-    const { dt_nascimento, ds_doencas_cronicas, ds_porte, st_castrado } = req.body;
+    const { dt_nascimento, ds_raca, ds_doencas_cronicas, ds_porte, st_castrado } = req.body;
     const existente = await WebPetPerfil.findOne({ where: { mob_animais_id } });
     const dados = {
       mob_animais_id,
       dt_nascimento: dt_nascimento || null,
+      ds_raca: ds_raca || null,
       ds_doencas_cronicas: ds_doencas_cronicas || null,
       ds_porte: ds_porte || null,
       st_castrado: st_castrado != null ? Number(st_castrado) : null,

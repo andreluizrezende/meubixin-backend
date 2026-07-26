@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true, allowNull: false },
       mob_animais_id: { type: DataTypes.INTEGER, allowNull: false, unique: true, references: { model: 'mob_animais', key: 'id' } },
       dt_nascimento: { type: DataTypes.DATEONLY, allowNull: true },
+      ds_raca: { type: DataTypes.STRING(120), allowNull: true },
       ds_doencas_cronicas: { type: DataTypes.TEXT, allowNull: true },
       ds_porte: { type: DataTypes.STRING(30), allowNull: true },
       st_castrado: { type: DataTypes.INTEGER, allowNull: true },
