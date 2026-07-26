@@ -271,22 +271,37 @@ route.get('/bulario/cache', async (req, res) => {
     const { WebBulasCache } = require('../../models');
     const { Op } = require('sequelize');
     const termo = String(nome).trim();
+    // Inclui bulas do PACIENTE e de fonte EXTERNA (fallbacks do enriquecimento
+    // p/ produtos sem bula do profissional). O dedup prefere 'profissional'.
     const rows = await WebBulasCache.findAll({
-      where: { tipo: 'profissional', nome_produto: { [Op.like]: `%${termo}%` } },
-      order: [['nome_produto', 'ASC']],
-      limit: 30,
-      attributes: ['id', 'nome_produto', 'empresa', 'cnpj', 'numero_registro', 'expediente', 'paginas', 'caracteres'],
+      where: { tipo: { [Op.in]: ['profissional', 'paciente', 'externo'] }, nome_produto: { [Op.like]: `%${termo}%` } },
+      order: [['nome_produto', 'ASC']], // dedup abaixo prefere 'profissional' independentemente da ordem
+      limit: 60,
+      attributes: ['id', 'nome_produto', 'empresa', 'cnpj', 'numero_registro', 'expediente', 'paginas', 'caracteres', 'tipo'],
     });
-    const itens = rows.map((r) => ({
-      id: r.id,
-      nome: r.nome_produto,
-      empresa: r.empresa,
-      cnpj: r.cnpj,
-      registro: r.numero_registro,
-      expediente: r.expediente,
-      paginas: r.paginas,
-      caracteres: r.caracteres,
-    }));
+    // Dedup por expediente, preferindo a bula do profissional quando houver ambas.
+    const porExpediente = new Map();
+    for (const r of rows) {
+      const chave = r.expediente || `id:${r.id}`;
+      const atual = porExpediente.get(chave);
+      if (!atual || (atual.tipo !== 'profissional' && r.tipo === 'profissional')) {
+        porExpediente.set(chave, r);
+      }
+    }
+    const itens = [...porExpediente.values()]
+      .sort((a, b) => String(a.nome_produto).localeCompare(String(b.nome_produto)))
+      .slice(0, 30)
+      .map((r) => ({
+        id: r.id,
+        nome: r.nome_produto,
+        empresa: r.empresa,
+        cnpj: r.cnpj,
+        registro: r.numero_registro,
+        expediente: r.expediente,
+        paginas: r.paginas,
+        caracteres: r.caracteres,
+        tipo: r.tipo, // 'profissional' | 'paciente'
+      }));
     return res.json({ itens });
   } catch (err) {
     return res.status(500).json({ message: 'Erro na busca do cache de bulas: ' + err.message });
@@ -310,6 +325,7 @@ route.get('/bulario/cache/:id', async (req, res) => {
       expediente: row.expediente,
       paginas: row.paginas,
       caracteres: row.caracteres,
+      tipo: row.tipo, // 'profissional' | 'paciente'
       texto: row.texto,
       concentracao: campos.concentracao,
       forma: campos.forma,

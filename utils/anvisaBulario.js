@@ -312,16 +312,33 @@ async function extrairTextoBula(token) {
  * profissional — TUDO numa MESMA sessão de página (token fresco, uma só carga).
  * @param {object} [opts] { expediente?, idProduto?, indice? }
  */
-async function bulaProfissionalPorNome(nome, opts = {}) {
+// Busca a bula de um produto pelo NOME. opts:
+//   tipo: 'profissional' (padrão) | 'paciente'
+//   fallbackPaciente: se true e o produto NÃO tiver bula do profissional, cai
+//     automaticamente para a do paciente (usado no enriquecimento dos "sem bula").
+// Retorna, além dos campos da bula, o `tipo` efetivamente coletado — para gravar
+// no cache com o tipo certo.
+async function bulaPorNome(nome, opts = {}) {
   if (!nome || !String(nome).trim()) throw new Error('nome é obrigatório');
   const capturado = await comPagina(async (page) => {
     const rb = await fetchJson(page, urlBusca(nome, 25));
     const { itens } = parseBusca(rb.body);
     if (!itens.length) { const e = new Error('Nenhum medicamento encontrado para: ' + nome); e.status = 404; throw e; }
     const item = escolherItem(itens, opts);
-    if (!item.tokenProfissional) { const e = new Error('Este produto não possui bula do profissional disponível.'); e.status = 404; throw e; }
-    const pdf = await fetchPdfB64(page, urlPdf(item.tokenProfissional));
-    return { item, pdf };
+    let tipo = opts.tipo === 'paciente' ? 'paciente' : 'profissional';
+    let token = tipo === 'paciente' ? item.tokenPaciente : item.tokenProfissional;
+    // Fallback: sem bula do profissional → tenta a do paciente.
+    if (!token && opts.fallbackPaciente && tipo === 'profissional' && item.tokenPaciente) {
+      tipo = 'paciente';
+      token = item.tokenPaciente;
+    }
+    if (!token) {
+      const e = new Error(`Este produto não possui bula ${tipo} disponível.`);
+      e.status = 404;
+      throw e;
+    }
+    const pdf = await fetchPdfB64(page, urlPdf(token));
+    return { item, pdf, tipo };
   });
   const bula = await textoDeB64(capturado.pdf); // pdf-parse roda no Node, fora da página
   const apres = extrairApresentacao(bula.texto);
@@ -333,10 +350,16 @@ async function bulaProfissionalPorNome(nome, opts = {}) {
     cnpj: it.cnpj,
     expediente: it.expediente,
     numeroRegistro: it.numeroRegistro,
+    tipo: capturado.tipo, // 'profissional' | 'paciente' (o que realmente veio)
     concentracao: apres.concentracao, // autopreenchimento (best-effort)
     forma: apres.forma,
     ...bula,
   };
+}
+
+// Compat: só a bula do profissional (sem fallback), usada pela rota /bulario/bula-profissional.
+async function bulaProfissionalPorNome(nome, opts = {}) {
+  return bulaPorNome(nome, { ...opts, tipo: 'profissional' });
 }
 
 async function encerrar() {
@@ -348,4 +371,4 @@ async function encerrar() {
   browserPromise = null;
 }
 
-module.exports = { buscar, extrairTextoBula, bulaProfissionalPorNome, encerrar };
+module.exports = { buscar, extrairTextoBula, bulaPorNome, bulaProfissionalPorNome, encerrar };
