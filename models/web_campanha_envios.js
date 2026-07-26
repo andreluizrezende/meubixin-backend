@@ -13,6 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       canal: { type: DataTypes.STRING(15), allowNull: false },
       ds_titulo: { type: DataTypes.STRING(255), allowNull: true },
       ds_mensagem: { type: DataTypes.TEXT, allowNull: true },
+      ds_descricao: { type: DataTypes.TEXT, allowNull: true },
       dt_agendado_para: { type: DataTypes.DATE, allowNull: false },
       dt_enviado: { type: DataTypes.DATE, allowNull: true },
       st_status: { type: DataTypes.STRING(15), allowNull: false, defaultValue: 'pendente' },

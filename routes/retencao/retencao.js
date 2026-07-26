@@ -16,7 +16,7 @@ route.use(requireAuth);
 route.get('/retencao/campanhas', async (req, res) => {
   try {
     const linhas = await sequelize.query(
-      `SELECT ce.id, ce.tp_gatilho, ce.canal, ce.ds_titulo, ce.dt_agendado_para,
+      `SELECT ce.id, ce.tp_gatilho, ce.canal, ce.ds_titulo, ce.ds_descricao, ce.dt_agendado_para,
               ce.dt_enviado, ce.st_status, ce.ds_erro, an.no_nome AS animal_nome,
               t.no_completo AS responsavel_nome
          FROM web_campanha_envios ce
@@ -87,8 +87,8 @@ route.post('/retencao/campanha/preview', async (req, res) => {
 // POST /retencao/campanha — cria a campanha parametrizável (filtros + mensagem).
 route.post('/retencao/campanha', async (req, res) => {
   try {
-    const { filtros, mensagem } = req.body || {};
-    const r = await criarCampanhaCustom({ vetId: req.vetId, filtros: filtros || {}, mensagem });
+    const { filtros, mensagem, nome, descricao } = req.body || {};
+    const r = await criarCampanhaCustom({ vetId: req.vetId, filtros: filtros || {}, mensagem, nome, descricao });
     return res.json({ success: true, ...r });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao criar campanha: ' + err.message });

@@ -256,7 +256,7 @@ async function previewCampanha({ vetId, filtros }) {
   };
 }
 
-async function criarCampanhaCustom({ vetId, filtros, mensagem }) {
+async function criarCampanhaCustom({ vetId, filtros, mensagem, nome, descricao }) {
   const cands = await filtrarPublico({ vetId, filtros });
   const consMap = await mapaConsentimento(cands);
   const render = (txt, c) => String(txt || '')
@@ -264,6 +264,8 @@ async function criarCampanhaCustom({ vetId, filtros, mensagem }) {
     .replace(/\{respons[aá]vel\}|\{tutor\}/gi, c.responsavel_nome || 'responsável');
   const nonce = Date.now(); // cada criação é uma campanha nova (blast único)
   const agora = new Date();
+  const nomeCampanha = (nome && String(nome).trim()) ? String(nome).trim().slice(0, 255) : 'Campanha';
+  const desc = (descricao && String(descricao).trim()) ? String(descricao).trim() : null;
   const linhas = [];
   for (const c of cands) {
     const canais = canaisPermitidos(c, 'campanha', consMap);
@@ -271,7 +273,7 @@ async function criarCampanhaCustom({ vetId, filtros, mensagem }) {
     for (const canal of canais) {
       linhas.push({
         web_veterinarios_id: vetId, mob_animais_id: c.mob_animais_id, mob_tutores_id: c.mob_tutores_id || null,
-        tp_gatilho: 'campanha', canal, ds_titulo: null, ds_mensagem: msg,
+        tp_gatilho: 'campanha', canal, ds_titulo: nomeCampanha, ds_descricao: desc, ds_mensagem: msg,
         dt_agendado_para: agora, st_status: 'pendente', ds_chave_dedup: `campanha:${nonce}:${c.mob_animais_id}:${canal}`,
       });
     }
