@@ -258,31 +258,36 @@ route.get('/bulario/medicamentos', async (req, res) => {
   }
 });
 
-// GET /produtos-veterinarios?nome=X[&especie=Cachorro] — busca no catálogo de
-// PRODUTOS VETERINÁRIOS (web_produtos_veterinarios, alimentado por
+// GET /produtos-veterinarios?nome=X[&especie=Cachorro][&tipo=vermifugo] — busca no
+// catálogo de PRODUTOS VETERINÁRIOS (web_produtos_veterinarios, alimentado por
 // scripts/importarProdutosVeterinarios.js). Só leitura do banco, roda na Vercel.
+// Com `tipo` (vermifugo|vacina), filtra pela subcategoria e NÃO exige nome (lista
+// tudo do tipo — usado pelos selects das abas de Vacinas/Vermífugos).
 route.get('/produtos-veterinarios', async (req, res) => {
-  const { nome, especie } = req.query;
-  if (!nome || String(nome).trim().length < 2) {
-    return res.status(400).json({ message: 'Informe ao menos 2 letras.' });
+  const { nome, especie, tipo } = req.query;
+  const TIPO_SUBCATS = { vermifugo: ['Vermífugo', 'Vermífugos'], vacina: ['Vacina', 'Vacinas'] };
+  const subcats = tipo ? TIPO_SUBCATS[String(tipo).toLowerCase()] : null;
+  const termo = nome ? String(nome).trim() : '';
+  if (!subcats && termo.length < 2) {
+    return res.status(400).json({ message: 'Informe ao menos 2 letras (ou um tipo válido).' });
   }
   try {
     const { WebProdutosVeterinarios } = require('../../models');
     const { Op } = require('sequelize');
-    const termo = String(nome).trim();
-    const where = {
-      st_ativo: 1,
-      [Op.or]: [
+    const where = { st_ativo: 1 };
+    if (subcats) where.subcategoria = { [Op.in]: subcats };
+    if (termo.length >= 2) {
+      where[Op.or] = [
         { nome: { [Op.like]: `%${termo}%` } },
         { principio_ativo: { [Op.like]: `%${termo}%` } },
         { indicacao: { [Op.like]: `%${termo}%` } },
-      ],
-    };
+      ];
+    }
     if (especie && String(especie).trim()) where.especie = String(especie).trim();
     const rows = await WebProdutosVeterinarios.findAll({
       where,
       order: [['nome', 'ASC']],
-      limit: 40,
+      limit: subcats ? 500 : 40, // com tipo, lista tudo para o select
     });
     const itens = rows.map((r) => ({
       id: r.id,
