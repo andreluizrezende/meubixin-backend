@@ -258,6 +258,52 @@ route.get('/bulario/medicamentos', async (req, res) => {
   }
 });
 
+// GET /produtos-veterinarios?nome=X[&especie=Cachorro] — busca no catálogo de
+// PRODUTOS VETERINÁRIOS (web_produtos_veterinarios, alimentado por
+// scripts/importarProdutosVeterinarios.js). Só leitura do banco, roda na Vercel.
+route.get('/produtos-veterinarios', async (req, res) => {
+  const { nome, especie } = req.query;
+  if (!nome || String(nome).trim().length < 2) {
+    return res.status(400).json({ message: 'Informe ao menos 2 letras.' });
+  }
+  try {
+    const { WebProdutosVeterinarios } = require('../../models');
+    const { Op } = require('sequelize');
+    const termo = String(nome).trim();
+    const where = {
+      st_ativo: 1,
+      [Op.or]: [
+        { nome: { [Op.like]: `%${termo}%` } },
+        { principio_ativo: { [Op.like]: `%${termo}%` } },
+        { indicacao: { [Op.like]: `%${termo}%` } },
+      ],
+    };
+    if (especie && String(especie).trim()) where.especie = String(especie).trim();
+    const rows = await WebProdutosVeterinarios.findAll({
+      where,
+      order: [['nome', 'ASC']],
+      limit: 40,
+    });
+    const itens = rows.map((r) => ({
+      id: r.id,
+      nome: r.nome,
+      marca: r.marca,
+      especie: r.especie,
+      categoria: r.categoria,
+      subcategoria: r.subcategoria,
+      principioAtivo: r.principio_ativo,
+      indicacao: r.indicacao,
+      apresentacao: r.apresentacao,
+      via: r.via,
+      porte: r.porte,
+      link: r.link,
+    }));
+    return res.json({ itens });
+  } catch (err) {
+    return res.status(500).json({ message: 'Erro na busca de produtos veterinários: ' + err.message });
+  }
+});
+
 // GET /bulario/cache?nome=X
 // Busca as bulas JÁ COLETADAS no cache local (web_bulas_cache, tipo=profissional),
 // preenchido pelo script scripts/enriquecerBulasAnvisa.js. Só metadados (sem o
