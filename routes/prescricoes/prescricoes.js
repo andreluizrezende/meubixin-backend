@@ -1204,6 +1204,9 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
         an.id,
         pp.ds_raca AS pet_raca,
         pp.dt_nascimento AS pet_nascimento,
+        pp.ds_porte AS pet_porte,
+        pp.st_castrado AS pet_castrado,
+        pp.ds_doencas_cronicas AS pet_doencas,
         t.no_completo AS tutor_nome,
         t.nu_cpf AS tutor_cpf,
         t.nu_telefone_completo AS tutor_telefone
@@ -1260,6 +1263,9 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
       vl_idade: primeiraLinha.vl_idade,
       ds_raca: primeiraLinha.pet_raca || null,
       dt_nascimento: primeiraLinha.pet_nascimento || null,
+      ds_porte: primeiraLinha.pet_porte || null,
+      st_castrado: primeiraLinha.pet_castrado,
+      ds_doencas_cronicas: primeiraLinha.pet_doencas || null,
       id: primeiraLinha.id
     };
 
