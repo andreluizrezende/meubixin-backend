@@ -1202,6 +1202,8 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
         an.ds_sexo,
         an.vl_idade,
         an.id,
+        pp.ds_raca AS pet_raca,
+        pp.dt_nascimento AS pet_nascimento,
         t.no_completo AS tutor_nome,
         t.nu_cpf AS tutor_cpf,
         t.nu_telefone_completo AS tutor_telefone
@@ -1210,6 +1212,7 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
       LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
       INNER JOIN web_veterinarios v ON v.id = a.web_veterinarios_id
       INNER JOIN mob_animais an ON an.id = a.mob_animais_id
+      LEFT JOIN web_pet_perfil pp ON pp.mob_animais_id = an.id
       INNER JOIN mob_tutores t ON t.id = an.mob_tutores_id
       WHERE a.id = :anamneseId
     `;
@@ -1255,6 +1258,8 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
       ds_especie: primeiraLinha.ds_especie,
       ds_sexo: primeiraLinha.ds_sexo,
       vl_idade: primeiraLinha.vl_idade,
+      ds_raca: primeiraLinha.pet_raca || null,
+      dt_nascimento: primeiraLinha.pet_nascimento || null,
       id: primeiraLinha.id
     };
 
