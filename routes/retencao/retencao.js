@@ -5,7 +5,7 @@ const { QueryTypes } = require('sequelize');
 const models = require('../../models');
 const { WebPetPerfil, WebConsentimento, sequelize } = models;
 const requireAuth = require('../../middleware/requireAuth');
-const { gerarGatilhos, processarCampanhas, previewGatilho, gerarGatilho } = require('../../utils/retencao');
+const { gerarGatilhos, processarCampanhas, previewGatilho, gerarGatilho, previewCampanha, criarCampanhaCustom } = require('../../utils/retencao');
 
 const TIPOS_GATILHO = ['inativo', 'aniversario', 'checkup_idoso', 'pos_atendimento'];
 
@@ -71,6 +71,27 @@ route.post('/retencao/gatilho', async (req, res) => {
     return res.json({ success: true, ...r });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao criar gatilho: ' + err.message });
+  }
+});
+
+// POST /retencao/campanha/preview — prévia do público de uma campanha parametrizável.
+route.post('/retencao/campanha/preview', async (req, res) => {
+  try {
+    const r = await previewCampanha({ vetId: req.vetId, filtros: (req.body && req.body.filtros) || {} });
+    return res.json({ success: true, ...r });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro na prévia da campanha: ' + err.message });
+  }
+});
+
+// POST /retencao/campanha — cria a campanha parametrizável (filtros + mensagem).
+route.post('/retencao/campanha', async (req, res) => {
+  try {
+    const { filtros, mensagem } = req.body || {};
+    const r = await criarCampanhaCustom({ vetId: req.vetId, filtros: filtros || {}, mensagem });
+    return res.json({ success: true, ...r });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao criar campanha: ' + err.message });
   }
 });
 

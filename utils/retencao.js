@@ -13,7 +13,7 @@ const models = require('../models');
 const { WebCampanhaEnvios, WebConsentimento, sequelize } = models;
 const { enviarEmail, enviarWhatsApp } = require('./notificacoes');
 
-const MARKETING = new Set(['inativo', 'aniversario', 'checkup_idoso']);
+const MARKETING = new Set(['inativo', 'aniversario', 'checkup_idoso', 'campanha']);
 const IDADE_IDOSO = 7;
 
 const ym = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -22,9 +22,10 @@ const semestre = (d) => `${d.getFullYear()}${d.getMonth() < 6 ? 'H1' : 'H2'}`;
 // SQL: animais do vet (por CRMV) + contato do responsável + perfil + última consulta.
 const BASE_SQL = `
   SELECT ani.id AS mob_animais_id, ani.no_nome AS animal_nome, ani.vl_idade,
+         ani.ds_especie AS especie,
          t.id AS mob_tutores_id, t.no_completo AS responsavel_nome,
          t.ds_email AS email, t.nu_telefone_completo AS telefone,
-         pp.dt_nascimento,
+         pp.dt_nascimento, pp.ds_raca, pp.ds_porte, pp.st_castrado, pp.ds_doencas_cronicas,
          (SELECT MAX(x.dt_data_anamnese) FROM web_anamneses x
            WHERE x.mob_animais_id = ani.id AND x.web_veterinarios_id = :vetId) AS ultima_consulta
     FROM mob_animais ani
@@ -215,6 +216,75 @@ async function gerarGatilho({ vetId, tp, mensagem }) {
   return { candidatos: cands.length, gerados };
 }
 
+// ---- Campanha PARAMETRIZÁVEL (filtros sobre os dados do sistema) ----
+// filtros: { especie, raca, porte, castrado('1'|'0'), idadeMin, idadeMax,
+//            diasSemConsulta, comDoencaCronica('sim'|'nao') } — todos opcionais.
+async function filtrarPublico({ vetId, filtros = {} }) {
+  if (!vetId) throw new Error('vetId é obrigatório');
+  const base = await sequelize.query(BASE_SQL, { replacements: { vetId }, type: QueryTypes.SELECT });
+  const agora = Date.now();
+  const f = filtros || {};
+  const norm = (s) => String(s || '').trim().toLowerCase();
+  return base.filter((b) => {
+    if (f.especie && norm(b.especie) !== norm(f.especie)) return false;
+    if (f.raca && !norm(b.ds_raca).includes(norm(f.raca))) return false;
+    if (f.porte && norm(b.ds_porte) !== norm(f.porte)) return false;
+    if (f.castrado === '1' && Number(b.st_castrado) !== 1) return false;
+    if (f.castrado === '0' && Number(b.st_castrado) === 1) return false;
+    const idade = b.dt_nascimento ? Math.floor((agora - new Date(b.dt_nascimento)) / (365.25 * 86400000)) : (b.vl_idade != null ? Number(b.vl_idade) : null);
+    if (f.idadeMin != null && f.idadeMin !== '' && (idade == null || idade < Number(f.idadeMin))) return false;
+    if (f.idadeMax != null && f.idadeMax !== '' && (idade == null || idade > Number(f.idadeMax))) return false;
+    if (f.diasSemConsulta != null && f.diasSemConsulta !== '') {
+      const ultima = b.ultima_consulta ? new Date(b.ultima_consulta) : null;
+      const dias = ultima ? (agora - ultima) / 86400000 : Infinity;
+      if (dias < Number(f.diasSemConsulta)) return false;
+    }
+    const temDoenca = !!(b.ds_doencas_cronicas && String(b.ds_doencas_cronicas).trim());
+    if (f.comDoencaCronica === 'sim' && !temDoenca) return false;
+    if (f.comDoencaCronica === 'nao' && temDoenca) return false;
+    return true;
+  });
+}
+
+async function previewCampanha({ vetId, filtros }) {
+  const cands = await filtrarPublico({ vetId, filtros });
+  const consMap = await mapaConsentimento(cands);
+  const elegiveis = cands.filter((c) => canaisPermitidos(c, 'campanha', consMap).length > 0);
+  return {
+    total: elegiveis.length,
+    amostra: elegiveis.slice(0, 10).map((c) => ({ animal_nome: c.animal_nome, responsavel_nome: c.responsavel_nome })),
+  };
+}
+
+async function criarCampanhaCustom({ vetId, filtros, mensagem }) {
+  const cands = await filtrarPublico({ vetId, filtros });
+  const consMap = await mapaConsentimento(cands);
+  const render = (txt, c) => String(txt || '')
+    .replace(/\{animal\}/gi, c.animal_nome || 'seu pet')
+    .replace(/\{respons[aá]vel\}|\{tutor\}/gi, c.responsavel_nome || 'responsável');
+  const nonce = Date.now(); // cada criação é uma campanha nova (blast único)
+  const agora = new Date();
+  const linhas = [];
+  for (const c of cands) {
+    const canais = canaisPermitidos(c, 'campanha', consMap);
+    const msg = mensagem && mensagem.trim() ? render(mensagem, c) : null;
+    for (const canal of canais) {
+      linhas.push({
+        web_veterinarios_id: vetId, mob_animais_id: c.mob_animais_id, mob_tutores_id: c.mob_tutores_id || null,
+        tp_gatilho: 'campanha', canal, ds_titulo: null, ds_mensagem: msg,
+        dt_agendado_para: agora, st_status: 'pendente', ds_chave_dedup: `campanha:${nonce}:${c.mob_animais_id}:${canal}`,
+      });
+    }
+  }
+  let gerados = 0;
+  if (linhas.length) {
+    const antes = await WebCampanhaEnvios.count({ where: { web_veterinarios_id: vetId } });
+    await WebCampanhaEnvios.bulkCreate(linhas, { ignoreDuplicates: true });
+    gerados = (await WebCampanhaEnvios.count({ where: { web_veterinarios_id: vetId } })) - antes;
+  }
+  return { candidatos: cands.length, gerados };
+}
+
 // ---- mensagens por gatilho ----
 function wrapEmail(titulo, corpo) {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"></head>
@@ -308,4 +378,4 @@ async function processarCampanhas({ vetId, limite = 50 } = {}) {
   return { processados: pend.length, enviados, erros, pulados };
 }
 
-module.exports = { gerarGatilhos, processarCampanhas, montarMensagem, previewGatilho, gerarGatilho, mensagemPadrao };
+module.exports = { gerarGatilhos, processarCampanhas, montarMensagem, previewGatilho, gerarGatilho, mensagemPadrao, previewCampanha, criarCampanhaCustom };
