@@ -137,6 +137,23 @@ route.put('/retencao/pet-perfil/:animalId', async (req, res) => {
   }
 });
 
+// GET /retencao/consentimento/:tutorId — estado atual (ausência de linha = tudo permitido).
+route.get('/retencao/consentimento/:tutorId', async (req, res) => {
+  try {
+    const c = await WebConsentimento.findOne({ where: { mob_tutores_id: req.params.tutorId } });
+    return res.json({
+      success: true,
+      consentimento: {
+        st_email: c ? c.st_email : 1,
+        st_whatsapp: c ? c.st_whatsapp : 1,
+        st_marketing: c ? c.st_marketing : 1,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao ler consentimento: ' + err.message });
+  }
+});
+
 // PUT /retencao/consentimento/:tutorId — opt-in/out de comunicação (LGPD).
 route.put('/retencao/consentimento/:tutorId', async (req, res) => {
   try {
