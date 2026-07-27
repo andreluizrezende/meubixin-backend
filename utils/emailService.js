@@ -22,7 +22,9 @@ const createTransporter = () => {
 
 // Template HTML para email de reset
 const createResetEmailTemplate = ({ name, resetUrl, expiresAt }) => {
+    // TZ explícito: em produção (Vercel) o processo roda em UTC e o horário sairia +3h.
     const expirationTime = new Date(expiresAt).toLocaleTimeString('pt-BR', {
+        timeZone: process.env.APP_TZ || 'America/Sao_Paulo',
         hour: '2-digit',
         minute: '2-digit'
     });

@@ -12,13 +12,22 @@ const TIPO_LABEL = {
   procedimento: 'Procedimento', teleconsulta: 'Teleconsulta',
 };
 
+// ⚠️ TZ: em produção (Vercel) o processo roda em UTC. NUNCA formatar data/hora com
+// getHours()/toLocale* sem `timeZone` — a mensagem sai 3h adiantada (16:30 → 19:30).
+// O instante gravado está correto (sequelize timezone '-03:00'); só a exibição errava.
+const TZ = process.env.APP_TZ || 'America/Sao_Paulo';
+const FMT_DATA = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, weekday: 'long', day: '2-digit', month: 'long' });
+const FMT_HORA = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
+const FMT_YMD = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
+
 // ---------- Geração de lembretes de DOSE ----------
 // vacina/vermífugo → por dose vencendo (≤15d à frente / ≤30d vencida).
 // medicamento → 1 por medicamento por DIA (doses de hoje) — "a cada 24h".
 async function gerarLembretesDose({ vetId }) {
   if (!vetId) throw new Error('vetId é obrigatório');
   const agora = new Date();
-  const ymd = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  // "hoje" no fuso do negócio (não no UTC do servidor) — chave de dedup diária.
+  const ymd = (d) => FMT_YMD.format(d).replace(/-/g, '');
 
   const periodicas = await sequelize.query(
     `SELECT ag.id AS agenda_id, p.st_tipo_protocolo AS tipo, ag.dt_data_aplicacao AS dt_dose,
@@ -127,8 +136,8 @@ function montarMensagemDose(row) {
 function montarMensagem(row) {
   if (row.tp_origem === 'dose') return montarMensagemDose(row);
   const dt = new Date(row.dt_inicio);
-  const data = dt.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
-  const hora = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+  const data = FMT_DATA.format(dt);
+  const hora = FMT_HORA.format(dt);
   const quando = row.tp_lembrete === 'lembrete_24h' ? 'amanhã' : 'hoje';
   const tipo = TIPO_LABEL[row.tp_agendamento] || 'Consulta';
   const nome = row.responsavel_nome || 'responsável';
