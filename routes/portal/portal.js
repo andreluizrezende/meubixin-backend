@@ -3,21 +3,16 @@
 // de escopo 'portal', NÃO o requireAuth do vet). Montar ANTES dos routers com
 // requireAuth no index.js. Identidade = req.tutorId (via requirePortal), nunca do corpo.
 const express = require('express');
-const crypto = require('crypto');
 const route = express.Router();
 const { QueryTypes } = require('sequelize');
 const models = require('../../models');
 const { MolResponsavelSessao, sequelize } = models;
 const requirePortal = require('../../middleware/requirePortal');
 const { signPortalToken } = require('../../utils/portalToken');
-const { enviarEmail, enviarWhatsApp } = require('../../utils/notificacoes');
-
-const APP_URL = process.env.WEB_APP_URL || process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:3000';
-const OTP_MIN = 15; // validade do código/link em minutos
+const { emitirEnviarAcesso } = require('../../utils/portalAcesso');
+const { getSignedUrlForDownload } = require('../../utils/s3_teste');
 
 const soDigitos = (s) => String(s || '').replace(/\D/g, '');
-const gerarCodigo = () => String(Math.floor(100000 + Math.random() * 900000));
-const gerarToken = () => crypto.randomBytes(24).toString('hex');
 
 // Acha o responsável (mob_tutores) por e-mail OU telefone. Telefone compara pelos
 // últimos 8+ dígitos (tolerante a DDI/DDD/formatação).
@@ -51,43 +46,12 @@ route.post('/portal/solicitar-acesso', async (req, res) => {
   try {
     const resp = await acharResponsavel(contato);
     if (!resp) return res.json(generico);
-
-    // anti-spam simples: reusa um código emitido há < 60s, se houver.
-    const recente = await MolResponsavelSessao.findOne({
-      where: { mob_tutores_id: resp.id, usado_em: null },
-      order: [['createdAt', 'DESC']],
+    // envia pelo mesmo tipo de contato informado (e-mail vs telefone).
+    await emitirEnviarAcesso({
+      tutor: resp,
+      canal: contato.includes('@') ? 'email' : 'whatsapp',
+      ip: req.ip, userAgent: req.headers['user-agent'],
     });
-    let codigo, token;
-    const agora = Date.now();
-    if (recente && agora - new Date(recente.createdAt).getTime() < 60000) {
-      codigo = recente.codigo; token = recente.token;
-    } else {
-      codigo = gerarCodigo(); token = gerarToken();
-      await MolResponsavelSessao.create({
-        mob_tutores_id: resp.id, codigo, token,
-        canal: contato.includes('@') ? 'email' : 'whatsapp',
-        dt_expira: new Date(agora + OTP_MIN * 60000),
-        ip: req.ip, user_agent: String(req.headers['user-agent'] || '').slice(0, 255),
-      });
-    }
-
-    const link = `${APP_URL}/portal/entrar?t=${token}`;
-    const primeiroNome = String(resp.no_completo || 'Responsável').split(' ')[0];
-    if (contato.includes('@')) {
-      if (resp.ds_email) {
-        await enviarEmail({
-          para: resp.ds_email,
-          assunto: 'Seu acesso ao Portal — Meu Bixin',
-          html: `<p>Olá, ${primeiroNome}!</p><p>Seu código de acesso é <b style="font-size:20px">${codigo}</b> (válido por ${OTP_MIN} min).</p><p>Ou entre direto: <a href="${link}">abrir o portal</a>.</p>`,
-          texto: `Olá, ${primeiroNome}! Seu código de acesso é ${codigo} (válido por ${OTP_MIN} min). Ou acesse: ${link}`,
-        }).catch((e) => console.error('[portal] email:', e.message));
-      }
-    } else if (resp.nu_telefone_completo) {
-      await enviarWhatsApp({
-        telefone: resp.nu_telefone_completo,
-        texto: `Olá, ${primeiroNome}! 🐾\nSeu código de acesso ao Portal Meu Bixin é *${codigo}* (válido por ${OTP_MIN} min).\nOu acesse direto: ${link}`,
-      }).catch((e) => console.error('[portal] whatsapp:', e.message));
-    }
     return res.json(generico);
   } catch (err) {
     console.error('[portal] solicitar-acesso:', err.message);
@@ -221,7 +185,10 @@ route.get('/portal/pets/:id/historico', requirePortal, async (req, res) => {
     }
     const linhas = await sequelize.query(
       `SELECT an.id, COALESCE(an.dt_data_anamnese, an.createdAt) AS data,
-              (SELECT COUNT(*) FROM web_protocolos wp WHERE wp.web_anamneses_id = an.id) AS qtd_protocolos
+              (SELECT COUNT(*) FROM web_protocolos wp WHERE wp.web_anamneses_id = an.id) AS qtd_protocolos,
+              EXISTS(SELECT 1 FROM web_registros_prescricoes rp
+                      WHERE rp.web_anamneses_id = an.id AND rp.status = 'assinada'
+                        AND rp.arquivo_s3_path IS NOT NULL) AS receita_assinada
          FROM web_anamneses an
         WHERE an.mob_animais_id = :animalId
         ORDER BY data DESC
@@ -231,6 +198,39 @@ route.get('/portal/pets/:id/historico', requirePortal, async (req, res) => {
     return res.json({ success: true, itens: linhas });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao carregar histórico: ' + err.message });
+  }
+});
+
+// GET /portal/pets/:id/consultas/:anamneseId/receita — URL assinada (S3) do PDF da
+// receita assinada digitalmente. Escopado: o pet é do responsável E a consulta é do pet.
+route.get('/portal/pets/:id/consultas/:anamneseId/receita', requirePortal, async (req, res) => {
+  try {
+    if (!(await petDoResponsavel(req.params.id, req.tutorId))) {
+      return res.status(404).json({ success: false, message: 'Pet não encontrado.' });
+    }
+    // a consulta precisa pertencer a este pet
+    const an = await sequelize.query(
+      'SELECT id FROM web_anamneses WHERE id = :anId AND mob_animais_id = :petId LIMIT 1',
+      { replacements: { anId: req.params.anamneseId, petId: req.params.id }, type: QueryTypes.SELECT }
+    );
+    if (!an.length) return res.status(404).json({ success: false, message: 'Consulta não encontrada.' });
+
+    const reg = await sequelize.query(
+      `SELECT arquivo_s3_path, codigo_verificacao FROM web_registros_prescricoes
+        WHERE web_anamneses_id = :anId AND status = 'assinada' AND arquivo_s3_path IS NOT NULL
+        ORDER BY id DESC LIMIT 1`,
+      { replacements: { anId: req.params.anamneseId }, type: QueryTypes.SELECT }
+    );
+    if (!reg.length) return res.status(404).json({ success: false, message: 'Receita assinada não encontrada.' });
+
+    const urlData = await getSignedUrlForDownload(reg[0].arquivo_s3_path, 3600);
+    return res.json({
+      success: true,
+      url: urlData.url,
+      fileName: `receita-${reg[0].codigo_verificacao || req.params.anamneseId}.pdf`,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao obter a receita: ' + err.message });
   }
 });
 

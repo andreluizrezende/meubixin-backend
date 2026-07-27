@@ -6,6 +6,7 @@ const models = require('../../models');
 const { WebAgendamentos, WebLembretes, sequelize } = models;
 const requireAuth = require('../../middleware/requireAuth');
 const { processarLembretes, gerarLembretesDose } = require('../../utils/processarLembretes');
+const { emitirEnviarAcesso } = require('../../utils/portalAcesso');
 // ---- Lembretes (Fase 2): GERAÇÃO das linhas. O MOTOR de disparo fica em
 // routes/agenda/lembretes.js (rota pública via WORKER_TOKEN, montada ANTES dos
 // routers com requireAuth global). Regras fixas (MVP): 24h e 2h antes.
@@ -93,6 +94,33 @@ route.get('/agenda/pacientes', async (req, res) => {
     return res.json({ success: true, itens: linhas });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao listar pacientes: ' + err.message });
+  }
+});
+
+// POST /agenda/pacientes/:animalId/enviar-portal — o VET dispara o acesso ao Portal
+// do Responsável (OTP + link) para o responsável do animal. Scoped por CRMV do vet.
+route.post('/agenda/pacientes/:animalId/enviar-portal', async (req, res) => {
+  try {
+    const r = await sequelize.query(
+      `SELECT t.id, t.no_completo, t.ds_email, t.nu_telefone_completo
+         FROM mob_animais a
+         JOIN mob_veterinarios v ON v.id = a.mob_veterinarios_id
+         JOIN web_veterinarios wv ON wv.id = :vetId
+         LEFT JOIN mob_tutores t ON t.id = a.mob_tutores_id
+        WHERE a.id = :animalId
+          AND v.nu_crmv = wv.nu_crmv AND v.ds_estado_crmv = wv.ds_estado_crmv
+        LIMIT 1`,
+      { replacements: { vetId: req.vetId, animalId: req.params.animalId }, type: QueryTypes.SELECT }
+    );
+    const tutor = r[0];
+    if (!tutor || !tutor.id) return res.status(404).json({ success: false, message: 'Paciente não encontrado.' });
+    if (!tutor.nu_telefone_completo && !tutor.ds_email) {
+      return res.status(400).json({ success: false, message: 'O responsável não tem WhatsApp nem e-mail cadastrado.' });
+    }
+    const { canal, enviado } = await emitirEnviarAcesso({ tutor, canal: 'auto', ip: req.ip, userAgent: req.headers['user-agent'] });
+    return res.json({ success: true, canal, enviado });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao enviar acesso ao portal: ' + err.message });
   }
 });
 
