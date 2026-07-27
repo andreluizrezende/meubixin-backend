@@ -6,11 +6,13 @@ const express = require('express');
 const route = express.Router();
 const { QueryTypes } = require('sequelize');
 const models = require('../../models');
-const { MolResponsavelSessao, sequelize } = models;
+const { MolResponsavelSessao, MolAgendaSolicitacao, WebConsentimento, WebCobrancas, WebCobrancaItens, sequelize } = models;
+const { web_veterinarios: WebVeterinarios } = models;
 const requirePortal = require('../../middleware/requirePortal');
 const { signPortalToken } = require('../../utils/portalToken');
 const { emitirEnviarAcesso } = require('../../utils/portalAcesso');
 const { getSignedUrlForDownload } = require('../../utils/s3_teste');
+const { criarLinkCheckout } = require('../cobrancas/cobrancas');
 
 const soDigitos = (s) => String(s || '').replace(/\D/g, '');
 
@@ -231,6 +233,144 @@ route.get('/portal/pets/:id/consultas/:anamneseId/receita', requirePortal, async
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao obter a receita: ' + err.message });
+  }
+});
+
+// ---- Fase 2: consentimento (LGPD) ----
+
+// GET /portal/consentimento — estado atual (ausência de linha = tudo permitido).
+route.get('/portal/consentimento', requirePortal, async (req, res) => {
+  try {
+    const c = await WebConsentimento.findOne({ where: { mob_tutores_id: req.tutorId } });
+    return res.json({
+      success: true,
+      consentimento: {
+        st_email: c ? c.st_email : 1,
+        st_whatsapp: c ? c.st_whatsapp : 1,
+        st_marketing: c ? c.st_marketing : 1,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao ler consentimento: ' + err.message });
+  }
+});
+
+// PUT /portal/consentimento — o próprio responsável ajusta seus opt-ins.
+route.put('/portal/consentimento', requirePortal, async (req, res) => {
+  try {
+    const { st_email, st_whatsapp, st_marketing } = req.body || {};
+    const dados = {
+      mob_tutores_id: req.tutorId,
+      st_email: st_email != null ? Number(st_email) : 1,
+      st_whatsapp: st_whatsapp != null ? Number(st_whatsapp) : 1,
+      st_marketing: st_marketing != null ? Number(st_marketing) : 1,
+    };
+    const existente = await WebConsentimento.findOne({ where: { mob_tutores_id: req.tutorId } });
+    if (existente) await existente.update(dados); else await WebConsentimento.create(dados);
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao salvar consentimento: ' + err.message });
+  }
+});
+
+// ---- Fase 2: cobranças + pagamento ----
+
+// GET /portal/cobrancas — cobranças dos animais do responsável.
+route.get('/portal/cobrancas', requirePortal, async (req, res) => {
+  try {
+    const linhas = await sequelize.query(
+      `SELECT c.id, c.descricao, c.status, c.total_cents, c.currency, c.createdAt,
+              an.no_nome AS animal_nome
+         FROM web_cobrancas c
+         JOIN mob_animais an ON an.id = c.mob_animais_id
+        WHERE an.mob_tutores_id = :tutorId
+        ORDER BY c.createdAt DESC
+        LIMIT 100`,
+      { replacements: { tutorId: req.tutorId }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, itens: linhas });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao listar cobranças: ' + err.message });
+  }
+});
+
+// GET /portal/cobrancas/:id/pagar — gera o link de checkout Stripe da cobrança.
+route.get('/portal/cobrancas/:id/pagar', requirePortal, async (req, res) => {
+  try {
+    const cob = await WebCobrancas.findByPk(req.params.id);
+    if (!cob) return res.status(404).json({ success: false, message: 'Cobrança não encontrada.' });
+    // escopo: o animal da cobrança tem que ser do responsável logado.
+    if (!cob.mob_animais_id || !(await petDoResponsavel(cob.mob_animais_id, req.tutorId))) {
+      return res.status(404).json({ success: false, message: 'Cobrança não encontrada.' });
+    }
+    if (cob.status === 'paga') return res.status(400).json({ success: false, message: 'Cobrança já paga.' });
+    const itens = await WebCobrancaItens.findAll({ where: { web_cobrancas_id: cob.id } });
+    const vet = await WebVeterinarios.findByPk(cob.web_veterinarios_id);
+    const r = await criarLinkCheckout({ ...cob.toJSON(), itens }, vet);
+    if (!r.success) return res.status(400).json({ success: false, message: r.message });
+    return res.json({ success: true, url: r.url });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao gerar pagamento: ' + err.message });
+  }
+});
+
+// ---- Fase 2: agendamentos (ver + solicitar) ----
+
+// GET /portal/agendamentos — próximos atendimentos dos pets do responsável.
+route.get('/portal/agendamentos', requirePortal, async (req, res) => {
+  try {
+    const ags = await sequelize.query(
+      `SELECT ag.id, ag.tp_agendamento, ag.dt_inicio, ag.ds_titulo, ag.ds_status,
+              an.no_nome AS animal_nome
+         FROM web_agendamentos ag
+         JOIN mob_animais an ON an.id = ag.mob_animais_id
+        WHERE an.mob_tutores_id = :tutorId
+          AND ag.dt_inicio >= (NOW() - INTERVAL 1 DAY)
+          AND (ag.ds_status IS NULL OR ag.ds_status NOT IN ('cancelado','faltou'))
+        ORDER BY ag.dt_inicio ASC
+        LIMIT 30`,
+      { replacements: { tutorId: req.tutorId }, type: QueryTypes.SELECT }
+    );
+    const sols = await sequelize.query(
+      `SELECT s.id, s.tp_agendamento, s.dt_sugerida, s.ds_motivo, s.ds_status, an.no_nome AS animal_nome
+         FROM mol_agenda_solicitacao s
+         JOIN mob_animais an ON an.id = s.mob_animais_id
+        WHERE s.mob_tutores_id = :tutorId AND s.ds_status = 'pendente'
+        ORDER BY s.createdAt DESC LIMIT 20`,
+      { replacements: { tutorId: req.tutorId }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, agendamentos: ags, solicitacoes: sols });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao carregar agenda: ' + err.message });
+  }
+});
+
+// POST /portal/solicitar-agendamento — o responsável pede um horário (vira pendente p/ o vet).
+route.post('/portal/solicitar-agendamento', requirePortal, async (req, res) => {
+  try {
+    const { mob_animais_id, tp_agendamento, dt_sugerida, ds_motivo } = req.body || {};
+    if (!mob_animais_id || !(await petDoResponsavel(mob_animais_id, req.tutorId))) {
+      return res.status(400).json({ success: false, message: 'Selecione um pet válido.' });
+    }
+    // resolve o vet (web) do animal por CRMV.
+    const v = await sequelize.query(
+      `SELECT wv.id FROM mob_animais a
+         JOIN mob_veterinarios mv ON mv.id = a.mob_veterinarios_id
+         JOIN web_veterinarios wv ON wv.nu_crmv = mv.nu_crmv AND wv.ds_estado_crmv = mv.ds_estado_crmv
+        WHERE a.id = :animalId LIMIT 1`,
+      { replacements: { animalId: mob_animais_id }, type: QueryTypes.SELECT }
+    );
+    if (!v.length) return res.status(400).json({ success: false, message: 'Não encontramos o veterinário deste pet.' });
+    await MolAgendaSolicitacao.create({
+      mob_animais_id, web_veterinarios_id: v[0].id, mob_tutores_id: req.tutorId,
+      tp_agendamento: tp_agendamento || 'consulta',
+      dt_sugerida: dt_sugerida || null,
+      ds_motivo: (ds_motivo || '').slice(0, 255) || null,
+      ds_status: 'pendente',
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao solicitar agendamento: ' + err.message });
   }
 });
 

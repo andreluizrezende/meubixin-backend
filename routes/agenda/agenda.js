@@ -3,7 +3,7 @@ const express = require('express');
 const route = express.Router();
 const { QueryTypes } = require('sequelize');
 const models = require('../../models');
-const { WebAgendamentos, WebLembretes, sequelize } = models;
+const { WebAgendamentos, WebLembretes, MolAgendaSolicitacao, sequelize } = models;
 const requireAuth = require('../../middleware/requireAuth');
 const { processarLembretes, gerarLembretesDose } = require('../../utils/processarLembretes');
 const { emitirEnviarAcesso } = require('../../utils/portalAcesso');
@@ -121,6 +121,67 @@ route.post('/agenda/pacientes/:animalId/enviar-portal', async (req, res) => {
     return res.json({ success: true, canal, enviado });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao enviar acesso ao portal: ' + err.message });
+  }
+});
+
+// GET /agenda/solicitacoes — pedidos de horário PENDENTES do Portal do Responsável
+// para este vet. Registrada antes de /agenda/:id para não colidir.
+route.get('/agenda/solicitacoes', async (req, res) => {
+  try {
+    const linhas = await sequelize.query(
+      `SELECT s.id, s.mob_animais_id, s.tp_agendamento, s.dt_sugerida, s.ds_motivo, s.createdAt,
+              an.no_nome AS animal_nome, t.no_completo AS responsavel_nome
+         FROM mol_agenda_solicitacao s
+         JOIN mob_animais an ON an.id = s.mob_animais_id
+         LEFT JOIN mob_tutores t ON t.id = an.mob_tutores_id
+        WHERE s.web_veterinarios_id = :vetId AND s.ds_status = 'pendente'
+        ORDER BY s.createdAt DESC`,
+      { replacements: { vetId: req.vetId }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, itens: linhas });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao listar solicitações: ' + err.message });
+  }
+});
+
+// POST /agenda/solicitacoes/:id/aceitar { dt_inicio, nu_duracao_min } — vira agendamento.
+route.post('/agenda/solicitacoes/:id/aceitar', async (req, res) => {
+  try {
+    const sol = await MolAgendaSolicitacao.findOne({
+      where: { id: req.params.id, web_veterinarios_id: req.vetId, ds_status: 'pendente' },
+    });
+    if (!sol) return res.status(404).json({ success: false, message: 'Solicitação não encontrada.' });
+    const dtInicio = req.body && req.body.dt_inicio ? req.body.dt_inicio : sol.dt_sugerida;
+    if (!dtInicio) return res.status(400).json({ success: false, message: 'Informe a data/hora do agendamento.' });
+
+    const ag = await WebAgendamentos.create({
+      web_veterinarios_id: req.vetId,
+      mob_animais_id: sol.mob_animais_id,
+      tp_agendamento: sol.tp_agendamento || 'consulta',
+      dt_inicio: dtInicio,
+      nu_duracao_min: (req.body && req.body.nu_duracao_min) || 30,
+      ds_titulo: sol.ds_motivo || null,
+      ds_status: 'agendado',
+    });
+    try { await gerarLembretes(ag); } catch (e) { console.error('gerarLembretes (aceitar solicitação):', e.message); }
+    await sol.update({ ds_status: 'aceita', web_agendamentos_id: ag.id });
+    return res.status(201).json({ success: true, agendamento: ag });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao aceitar solicitação: ' + err.message });
+  }
+});
+
+// POST /agenda/solicitacoes/:id/recusar
+route.post('/agenda/solicitacoes/:id/recusar', async (req, res) => {
+  try {
+    const sol = await MolAgendaSolicitacao.findOne({
+      where: { id: req.params.id, web_veterinarios_id: req.vetId, ds_status: 'pendente' },
+    });
+    if (!sol) return res.status(404).json({ success: false, message: 'Solicitação não encontrada.' });
+    await sol.update({ ds_status: 'recusada' });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao recusar solicitação: ' + err.message });
   }
 });
 

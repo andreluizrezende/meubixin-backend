@@ -521,3 +521,5 @@ route.delete('/cobrancas/:id/anexos/:anexoId', async (req, res) => {
 });
 
 module.exports = route;
+// Reutilizado pelo Portal do Responsável (gerar link de pagamento da cobrança).
+module.exports.criarLinkCheckout = criarLinkCheckout;
