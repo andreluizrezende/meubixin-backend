@@ -19,14 +19,16 @@ const REGRAS_LEMBRETE = [
 // que ainda são futuras viram lembretes agendados; se o agendamento é IMINENTE
 // (a menos da menor antecedência), cria um único lembrete IMEDIATO por canal —
 // melhor avisar tarde do que não avisar (e permite validar na hora).
+// Retorna { gerados, motivo? } — nunca lança para casos "esperados" (passado/sem
+// contato); ainda pode lançar em erro real de banco (o chamador captura e expõe).
 async function gerarLembretes(ag) {
   const inicio = new Date(ag.dt_inicio).getTime();
   const agora = Date.now();
-  if (inicio <= agora) return; // agendamento no passado → nada
+  if (inicio <= agora) return { gerados: 0, motivo: 'agendamento no passado' };
   const canais = [];
   if (ag.ds_email_responsavel) canais.push('email');
   if (ag.nu_telefone_responsavel) canais.push('whatsapp');
-  if (!canais.length) return;
+  if (!canais.length) return { gerados: 0, motivo: 'responsável sem e-mail/WhatsApp' };
   const futuras = REGRAS_LEMBRETE.filter((r) => inicio - r.ms > agora);
   const linhas = [];
   for (const canal of canais) {
@@ -40,6 +42,18 @@ async function gerarLembretes(ag) {
     }
   }
   if (linhas.length) await WebLembretes.bulkCreate(linhas);
+  return { gerados: linhas.length };
+}
+
+// Chama gerarLembretes capturando erro real (não engole silencioso): loga o erro
+// completo e devolve um objeto para a resposta da API expor o que aconteceu.
+async function gerarLembretesSeguro(ag, ctx) {
+  try {
+    return await gerarLembretes(ag);
+  } catch (e) {
+    console.error(`gerarLembretes (${ctx}) FALHOU para agendamento ${ag && ag.id}:`, e);
+    return { gerados: 0, erro: e.message };
+  }
 }
 
 async function cancelarLembretesPendentes(agId) {
@@ -163,9 +177,9 @@ route.post('/agenda/solicitacoes/:id/aceitar', async (req, res) => {
       ds_titulo: sol.ds_motivo || null,
       ds_status: 'agendado',
     });
-    try { await gerarLembretes(ag); } catch (e) { console.error('gerarLembretes (aceitar solicitação):', e.message); }
+    const lembretes = await gerarLembretesSeguro(ag, 'aceitar-solicitacao');
     await sol.update({ ds_status: 'aceita', web_agendamentos_id: ag.id });
-    return res.status(201).json({ success: true, agendamento: ag });
+    return res.status(201).json({ success: true, agendamento: ag, lembretes });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao aceitar solicitação: ' + err.message });
   }
@@ -291,8 +305,8 @@ route.post('/agenda', async (req, res) => {
       ds_observacoes: dados.ds_observacoes || null,
       ds_status: 'agendado',
     });
-    try { await gerarLembretes(ag); } catch (e) { console.error('gerarLembretes (create):', e.message); }
-    return res.status(201).json({ success: true, agendamento: ag });
+    const lembretes = await gerarLembretesSeguro(ag, 'create');
+    return res.status(201).json({ success: true, agendamento: ag, lembretes });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao criar o agendamento: ' + err.message });
   }
@@ -305,8 +319,9 @@ route.put('/agenda/:id', async (req, res) => {
     if (!ag) return res.status(404).json({ success: false, message: 'Agendamento não encontrado.' });
     await ag.update(camposEditaveis(req.body));
     // Remarcou/editou → recria os lembretes pendentes com a data nova.
-    try { await cancelarLembretesPendentes(ag.id); await gerarLembretes(ag); } catch (e) { console.error('gerarLembretes (update):', e.message); }
-    return res.json({ success: true, agendamento: ag });
+    try { await cancelarLembretesPendentes(ag.id); } catch (e) { console.error('cancelarLembretesPendentes (update):', e.message); }
+    const lembretes = await gerarLembretesSeguro(ag, 'update');
+    return res.json({ success: true, agendamento: ag, lembretes });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao atualizar o agendamento: ' + err.message });
   }
@@ -352,8 +367,8 @@ route.post('/agenda/:id/retorno', async (req, res) => {
       ds_observacoes: req.body.ds_observacoes || null,
       ds_status: 'agendado',
     });
-    try { await gerarLembretes(ret); } catch (e) { console.error('gerarLembretes (retorno):', e.message); }
-    return res.status(201).json({ success: true, agendamento: ret });
+    const lembretes = await gerarLembretesSeguro(ret, 'retorno');
+    return res.status(201).json({ success: true, agendamento: ret, lembretes });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao criar o retorno: ' + err.message });
   }
