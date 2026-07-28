@@ -19,15 +19,24 @@ route.post("/ia/diagnostico", async (req, res) => {
       gender,
       anamnesis,
       clinicalExamination,
+      chronicDiseases,
+      neutered,
       lang = "pt-br",
     } = req.body;
 
-    const prompt =
-      `Species: ${species}\n\n` +
-      `Age: ${age}\n\n` +
-      `Gender: ${gender}\n\n` +
-      `Anamnesis: ${anamnesis}\n\n` +
-      `Clinical examination: ${clinicalExamination}`;
+    // Só entram no prompt os campos PREENCHIDOS — antes mandava "Species: undefined"
+    // quando o dado faltava, o que só polui o contexto da IA.
+    const prompt = [
+      species && `Species: ${species}`,
+      age && `Age: ${age}`,
+      gender && `Gender: ${gender}`,
+      neutered && `Neutered: ${neutered}`,
+      chronicDiseases && `Chronic diseases: ${chronicDiseases}`,
+      anamnesis && `Anamnesis: ${anamnesis}`,
+      clinicalExamination && `Clinical examination: ${clinicalExamination}`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     const resposta = await fetch(`${AI_BASE_URL}/question/diseases`, {
       method: "POST",
