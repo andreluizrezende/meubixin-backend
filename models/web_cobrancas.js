@@ -16,6 +16,10 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: 'web_cobrancas_id',
         as: 'anexos'
       });
+      WebCobrancas.belongsTo(models.WebAnamneses, {
+        foreignKey: 'web_anamneses_id',
+        as: 'consulta'
+      });
     }
   }
 
@@ -66,6 +70,13 @@ module.exports = (sequelize, DataTypes) => {
       mob_animais_id: {
         type: DataTypes.INTEGER,
         allowNull: true
+      },
+      // Consulta (anamnese) que esta cobrança está faturando — opcional, pois
+      // cobrança avulsa (sem atendimento registrado) continua válida.
+      web_anamneses_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: { model: 'web_anamneses', key: 'id' }
       },
       stripe_checkout_session_id: {
         type: DataTypes.STRING(255),

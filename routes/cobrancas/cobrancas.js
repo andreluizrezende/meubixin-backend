@@ -11,7 +11,8 @@ const {
   WebCobrancas,
   WebCobrancaItens,
   WebPagamentos,
-  WebCobrancaAnexos
+  WebCobrancaAnexos,
+  WebAnamneses
 } = models;
 const requireAuth = require('../../middleware/requireAuth');
 const { getStripe, getWebAppUrl } = require('../../utils/stripeClient');
@@ -248,10 +249,27 @@ function totalCents(itens) {
   return itens.reduce((acc, it) => acc + it.quantidade * it.valor_unitario_cents, 0);
 }
 
+// Sentinela: distingue "não informou consulta" (→ null, vínculo opcional) de
+// "informou uma consulta que não é dele" (→ 400).
+const INVALIDA = Symbol('consulta-invalida');
+
+// Valida o vínculo opcional cobrança → consulta. Devolve o id, null (sem vínculo)
+// ou INVALIDA quando a anamnese não existe / é de outro veterinário.
+async function validarConsulta(web_anamneses_id, vetId) {
+  if (!web_anamneses_id) return null;
+  const id = parseInt(web_anamneses_id, 10);
+  if (Number.isNaN(id)) return INVALIDA;
+  const anamnese = await WebAnamneses.findOne({
+    where: { id, web_veterinarios_id: vetId },
+    attributes: ['id']
+  });
+  return anamnese ? id : INVALIDA;
+}
+
 // POST /cobrancas  body: { vetId, cliente_nome, cliente_email?, cliente_documento?, descricao?, itens: [] }
 route.post('/cobrancas', async (req, res) => {
   try {
-    const { cliente_nome, cliente_email, cliente_documento, descricao, itens, mob_animais_id } = req.body;
+    const { cliente_nome, cliente_email, cliente_documento, descricao, itens, mob_animais_id, web_anamneses_id } = req.body;
     const vet = await WebVeterinarios.findByPk(req.vetId);
     if (!vet) return res.status(404).json({ success: false, message: 'Veterinário não encontrado' });
     if (!cliente_nome || !String(cliente_nome).trim()) {
@@ -263,6 +281,13 @@ route.post('/cobrancas', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Adicione ao menos um item válido' });
     }
 
+    // Consulta associada (opcional). Confere que a anamnese é DESTE veterinário —
+    // o id vem do cliente, então não dá para confiar nele.
+    const anamneseId = await validarConsulta(web_anamneses_id, req.vetId);
+    if (anamneseId === INVALIDA) {
+      return res.status(400).json({ success: false, message: 'Consulta inválida ou de outro veterinário' });
+    }
+
     const cobranca = await WebCobrancas.create({
       web_veterinarios_id: vet.id,
       cliente_nome: String(cliente_nome).trim(),
@@ -270,6 +295,7 @@ route.post('/cobrancas', async (req, res) => {
       cliente_documento: cliente_documento || null,
       descricao: descricao || null,
       mob_animais_id: mob_animais_id || null,
+      web_anamneses_id: anamneseId,
       status: 'rascunho',
       total_cents: totalCents(itensNorm),
       currency: 'brl'
@@ -298,7 +324,10 @@ route.get('/cobrancas', async (req, res) => {
     }
     const cobrancas = await WebCobrancas.findAll({
       where,
-      include: [{ model: WebCobrancaItens, as: 'itens' }],
+      include: [
+        { model: WebCobrancaItens, as: 'itens' },
+        { model: WebAnamneses, as: 'consulta', attributes: ['id', 'dt_data_anamnese'], required: false }
+      ],
       order: [['createdAt', 'DESC']]
     });
     return res.json({ success: true, cobrancas });
@@ -315,7 +344,8 @@ route.get('/cobrancas/:id', async (req, res) => {
       include: [
         { model: WebCobrancaItens, as: 'itens' },
         { model: WebPagamentos, as: 'pagamentos' },
-        { model: WebCobrancaAnexos, as: 'anexos' }
+        { model: WebCobrancaAnexos, as: 'anexos' },
+        { model: WebAnamneses, as: 'consulta', attributes: ['id', 'dt_data_anamnese'], required: false }
       ]
     });
     if (!cobranca) return res.status(404).json({ success: false, message: 'Cobrança não encontrada' });

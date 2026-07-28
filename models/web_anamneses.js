@@ -34,6 +34,16 @@ module.exports = (sequelize, DataTypes) => {
           key: 'id'
         }
       },
+      // Agendamento que originou esta consulta (opcional — consultas criadas
+      // direto pela tela de Prescrições não têm agendamento).
+      web_agendamentos_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'web_agendamentos',
+          key: 'id'
+        }
+      },
       dt_data_anamnese: {
         type: DataTypes.DATE,
         allowNull: true

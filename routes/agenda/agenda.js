@@ -205,6 +205,7 @@ route.get('/agenda/lembretes', async (req, res) => {
   try {
     const linhas = await sequelize.query(
       `SELECT l.id, l.tp_lembrete, l.tp_origem, l.canal, l.dt_agendado_para, l.dt_enviado, l.st_status, l.ds_erro,
+              l.createdAt AS dt_criado,
               a.dt_inicio, a.tp_agendamento,
               COALESCE(a.ds_titulo, l.ds_titulo) AS ds_titulo,
               an.no_nome AS animal_nome,
@@ -258,7 +259,17 @@ route.get('/agenda', async (req, res) => {
     const linhas = await sequelize.query(
       `SELECT a.*, an.no_nome AS animal_nome, an.ds_especie AS animal_especie,
               t.no_completo AS responsavel_nome, t.nu_telefone_completo AS responsavel_telefone,
-              t.ds_email AS responsavel_email
+              t.ds_email AS responsavel_email,
+              -- Consulta gerada a partir deste agendamento (a mais recente, se o vet
+              -- iniciou o atendimento mais de uma vez) e quantas cobranças ela tem.
+              -- Subquery em vez de JOIN para não multiplicar linhas do calendário.
+              (SELECT an2.id FROM web_anamneses an2
+                WHERE an2.web_agendamentos_id = a.id
+                ORDER BY an2.id DESC LIMIT 1) AS web_anamneses_id,
+              (SELECT COUNT(*) FROM web_cobrancas c
+                WHERE c.web_anamneses_id IN (
+                  SELECT an3.id FROM web_anamneses an3 WHERE an3.web_agendamentos_id = a.id
+                )) AS qt_cobrancas
          FROM web_agendamentos a
          JOIN mob_animais an ON an.id = a.mob_animais_id
          LEFT JOIN mob_tutores t ON t.id = an.mob_tutores_id

@@ -137,6 +137,9 @@ route.post('/prescricoes', async (req, res) => {
     const anamneseCriada = await WebAnamneses.create({
       web_veterinarios_id: anamnese.web_veterinarios_id,
       mob_animais_id: anamnese.mob_animais_id,
+      // Agendamento de origem (quando o atendimento foi iniciado pela Agenda).
+      // Opcional: prescrição criada direto pela tela fica sem vínculo.
+      web_agendamentos_id: anamnese.web_agendamentos_id || null,
       dt_data_anamnese: anamnese.dt_data_anamnese,
       ds_quadro_clinico: anamnese.ds_quadro_clinico,
       ds_resultados_exames_anteriores: anamnese.ds_resultados_exames_anteriores,
@@ -862,14 +865,30 @@ route.get('/protocolos/animal/:animalId', async (req, res) => {
 route.get('/anamneses/animal/:animalId', async (req, res) => {
   try {
     const { animalId } = req.params;
-    console.log("Buscando anamneses por animal:", animalId);
+    // ?assinadas=1 → devolve só as consultas cuja prescrição foi ASSINADA
+    // digitalmente (usado pelo select de Consulta da cobrança). Opcional para não
+    // mudar o comportamento de quem já chama a rota sem o parâmetro.
+    const somenteAssinadas = ['1', 'true'].includes(String(req.query.assinadas || ''));
+    console.log("Buscando anamneses por animal:", animalId, '| somenteAssinadas:', somenteAssinadas);
 
     const anamneses = await WebAnamneses.findAll({
       where: { mob_animais_id: animalId },
       order: [['dt_data_anamnese', 'DESC']]
     });
 
-    res.json(anamneses || []);
+    if (!somenteAssinadas || anamneses.length === 0) {
+      return res.json(anamneses || []);
+    }
+
+    // Fonte de verdade da assinatura: web_registros_prescricoes.status = 'assinada'
+    // (mesmo critério da listagem de prescrições, que rotula 'assinado_digitalmente').
+    const assinadas = await web_registros_prescricoes.findAll({
+      where: { web_anamneses_id: anamneses.map(a => a.id), status: 'assinada' },
+      attributes: ['web_anamneses_id']
+    });
+    const assinadasSet = new Set(assinadas.map(r => String(r.web_anamneses_id)));
+
+    return res.json(anamneses.filter(a => assinadasSet.has(String(a.id))));
 
   } catch (error) {
     console.log('ERRO em /anamneses/animal/:animalId');
