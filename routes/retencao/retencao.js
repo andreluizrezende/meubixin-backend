@@ -3,7 +3,7 @@ const express = require('express');
 const route = express.Router();
 const { QueryTypes } = require('sequelize');
 const models = require('../../models');
-const { WebPetPerfil, WebConsentimento, sequelize } = models;
+const { WebPetPerfil, WebConsentimento, WebTutorPerfil, sequelize } = models;
 const requireAuth = require('../../middleware/requireAuth');
 const { gerarGatilhos, processarCampanhas, previewGatilho, gerarGatilho, previewCampanha, criarCampanhaCustom } = require('../../utils/retencao');
 
@@ -171,6 +171,45 @@ route.put('/retencao/consentimento/:tutorId', async (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Erro ao salvar consentimento: ' + err.message });
+  }
+});
+
+// ---- Endereço do RESPONSÁVEL (satélite web_tutor_perfil) ----
+// Conteúdo mínimo dos atestados (Resolução CFMV 1.321/2020). Vive aqui, junto do
+// consentimento, porque é o outro dado do responsável editado pelo PetPerfilCard.
+// Satélite porque mob_tutores não pode ser alterada (só web_*).
+
+// GET /retencao/tutor-perfil/:tutorId — endereço atual (null quando nunca preenchido).
+route.get('/retencao/tutor-perfil/:tutorId', async (req, res) => {
+  try {
+    const perfil = await WebTutorPerfil.findOne({ where: { mob_tutores_id: req.params.tutorId } });
+    return res.json({ success: true, perfil: perfil || null });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao ler endereço do responsável: ' + err.message });
+  }
+});
+
+// PUT /retencao/tutor-perfil/:tutorId — cria/atualiza (find-or-create pelo unique).
+route.put('/retencao/tutor-perfil/:tutorId', async (req, res) => {
+  try {
+    const mob_tutores_id = Number(req.params.tutorId);
+    const { ds_logradouro, nu_numero, ds_complemento, ds_bairro, ds_cidade, ds_uf, nu_cep } = req.body;
+    const dados = {
+      mob_tutores_id,
+      ds_logradouro: ds_logradouro || null,
+      nu_numero: nu_numero || null,
+      ds_complemento: ds_complemento || null,
+      ds_bairro: ds_bairro || null,
+      ds_cidade: ds_cidade || null,
+      ds_uf: ds_uf ? String(ds_uf).toUpperCase().slice(0, 2) : null,
+      nu_cep: nu_cep || null,
+    };
+    const existente = await WebTutorPerfil.findOne({ where: { mob_tutores_id } });
+    if (existente) await existente.update(dados);
+    else await WebTutorPerfil.create(dados);
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao salvar endereço do responsável: ' + err.message });
   }
 });
 

@@ -65,6 +65,18 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(500),
       allowNull: true
     },
+    // Endereço profissional + estabelecimento: conteúdo mínimo dos atestados
+    // (Resolução CFMV 1.321/2020) e do "Grupo B" da Receita.
+    ds_logradouro: { type: DataTypes.STRING(255), allowNull: true },
+    nu_numero: { type: DataTypes.STRING(20), allowNull: true },
+    ds_complemento: { type: DataTypes.STRING(120), allowNull: true },
+    ds_bairro: { type: DataTypes.STRING(120), allowNull: true },
+    ds_cidade: { type: DataTypes.STRING(120), allowNull: true },
+    ds_uf: { type: DataTypes.STRING(2), allowNull: true },
+    nu_cep: { type: DataTypes.STRING(9), allowNull: true },
+    ds_clinica_nome: { type: DataTypes.STRING(255), allowNull: true },
+    nu_clinica_cnpj: { type: DataTypes.STRING(18), allowNull: true },
+    nu_clinica_crmv_pj: { type: DataTypes.STRING(30), allowNull: true },
     stripe_connect_account_id: {
       type: DataTypes.STRING(255),
       allowNull: true,
