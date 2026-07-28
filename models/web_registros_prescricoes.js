@@ -9,11 +9,26 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       autoIncrement: true
     },
+    // POLIMÓRFICA: rastreia o PDF assinado de uma PRESCRIÇÃO (web_anamneses) ou de
+    // um ATESTADO (web_atestados). Exatamente um dos dois ids é preenchido.
+    tp_origem: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'prescricao' // prescricao | atestado
+    },
     web_anamneses_id: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true, // null quando tp_origem = 'atestado'
       references: {
         model: 'web_anamneses',
+        key: 'id'
+      }
+    },
+    web_atestados_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true, // null quando tp_origem = 'prescricao'
+      references: {
+        model: 'web_atestados',
         key: 'id'
       }
     },
@@ -71,6 +86,10 @@ module.exports = (sequelize, DataTypes) => {
     web_registros_prescricoes.belongsTo(models.WebAnamneses, {
       foreignKey: 'web_anamneses_id',
       as: 'anamnese'
+    });
+    web_registros_prescricoes.belongsTo(models.WebAtestados, {
+      foreignKey: 'web_atestados_id',
+      as: 'atestado'
     });
   };
 

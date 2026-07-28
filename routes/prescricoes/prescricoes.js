@@ -1506,21 +1506,27 @@ route.get('/prescricoes/verificar/:codigo', async (req, res) => {
   try {
     const { codigo } = req.params;
 
+    // POLIMÓRFICA: o registro pode ser de uma prescrição (web_anamneses) ou de um
+    // atestado (web_atestados). Tudo em LEFT JOIN — com INNER, o atestado sumiria
+    // da conferência, que era exatamente o bloqueio antes da migration 20260728120001.
     const verificacaoSQL = `
-      SELECT 
+      SELECT
         r.codigo_verificacao,
         r.status,
+        r.tp_origem,
         r.dt_criacao,
         r.dt_assinatura,
         r.arquivo_s3_path,
-        v.no_completo,
-        v.nu_crmv,
-        v.ds_estado_crmv,
-        an.dt_data_anamnese
+        COALESCE(v.no_completo, va.no_completo) AS no_completo,
+        COALESCE(v.nu_crmv, va.nu_crmv) AS nu_crmv,
+        COALESCE(v.ds_estado_crmv, va.ds_estado_crmv) AS ds_estado_crmv,
+        COALESCE(an.dt_data_anamnese, at.dt_emissao) AS dt_data_anamnese,
+        at.tp_atestado
       FROM web_registros_prescricoes r
-      INNER JOIN web_anamneses an ON an.id = r.web_anamneses_id
-      INNER JOIN web_veterinarios v ON v.id = an.web_veterinarios_id
-      INNER JOIN mob_animais a ON a.id = an.mob_animais_id
+      LEFT JOIN web_anamneses an ON an.id = r.web_anamneses_id
+      LEFT JOIN web_veterinarios v ON v.id = an.web_veterinarios_id
+      LEFT JOIN web_atestados at ON at.id = r.web_atestados_id
+      LEFT JOIN web_veterinarios va ON va.id = at.web_veterinarios_id
       WHERE r.codigo_verificacao = :codigo
     `;
 
@@ -1538,11 +1544,25 @@ route.get('/prescricoes/verificar/:codigo', async (req, res) => {
 
     const dados = resultado[0];
 
+    // Rótulo do documento — a tela pública dizia "Prescrição" fixo, o que estaria
+    // errado para atestado.
+    const LABEL_ATESTADO = {
+      saude: 'Atestado de Saúde Animal',
+      vacinacao: 'Atestado de Vacinação',
+      carteira_vacinacao: 'Carteira de Vacinação',
+      obito: 'Atestado de Óbito'
+    };
+    const tipoDocumento = dados.tp_origem === 'atestado'
+      ? (LABEL_ATESTADO[dados.tp_atestado] || 'Atestado')
+      : 'Prescrição';
+
     res.json({
       success: true,
       dados: {
         codigoVerificacao: dados.codigo_verificacao,
         status: dados.status,
+        tpOrigem: dados.tp_origem || 'prescricao',
+        tipoDocumento,
         veterinario: {
           nome: dados.no_completo,
           crmv: `${dados.nu_crmv}-${dados.ds_estado_crmv}`

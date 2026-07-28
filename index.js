@@ -66,6 +66,7 @@ const rotaBulario = require('./routes/bulario/bulario')
 const rotaAgenda = require('./routes/agenda/agenda')
 const rotaLembretes = require('./routes/agenda/lembretes')
 const rotaRetencao = require('./routes/retencao/retencao')
+const rotaAtestados = require('./routes/atestados/atestados')
 const rotaRetencaoWorker = require('./routes/retencao/retencaoWorker')
 const rotaPortal = require('./routes/portal/portal')
 
@@ -127,6 +128,8 @@ app.use(rotaAssinatura);
 // interferir na cadeia (o requireAuth só roda para as rotas /agenda).
 app.use(rotaAgenda);
 app.use(rotaRetencao);
+// Atestados: também usa route.use(requireAuth) próprio → por último.
+app.use(rotaAtestados);
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`running on port: ${PORT}`))
