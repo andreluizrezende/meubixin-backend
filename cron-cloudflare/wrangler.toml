@@ -1,0 +1,25 @@
+name = "meubixin-cron"
+main = "src/index.js"
+compatibility_date = "2026-07-28"
+
+# Agendamentos (UTC — irrelevante aqui, os intervalos são relativos).
+# O plano gratuito permite ATÉ 3 cron triggers por Worker.
+#   */15 * * * *  → lembretes da agenda (sensível a horário: 24h/2h antes)
+#   5 * * * *     → campanhas de retenção (de hora em hora, aos :05)
+# Se mudar estas expressões, ajuste também as constantes CRON_LEMBRETES /
+# CRON_RETENCAO em src/index.js — é por elas que o Worker decide o que chamar.
+[triggers]
+crons = ["*/15 * * * *", "5 * * * *"]
+
+[vars]
+# URL do backend em produção, SEM barra no fim. TROQUE antes do primeiro deploy:
+# é o mesmo valor do NEXT_PUBLIC_API_URL de Production do frontend na Vercel.
+BACKEND_URL = "https://TROQUE-PELA-URL-DO-BACKEND"
+
+# WORKER_TOKEN NÃO vai aqui — é secret:
+#   npx wrangler secret put WORKER_TOKEN
+# Precisa ser exatamente o mesmo valor da env var WORKER_TOKEN na Vercel.
+
+# Observabilidade: sem isto, `wrangler tail` não mostra os console.log.
+[observability]
+enabled = true
