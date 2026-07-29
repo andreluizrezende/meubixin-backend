@@ -68,6 +68,7 @@ const rotaLembretes = require('./routes/agenda/lembretes')
 const rotaRetencao = require('./routes/retencao/retencao')
 const rotaAtestados = require('./routes/atestados/atestados')
 const rotaGeoVeterinarios = require('./routes/geo/veterinarios')
+const rotaAppAtestados = require('./routes/app/atestados')
 const rotaRetencaoWorker = require('./routes/retencao/retencaoWorker')
 const rotaPortal = require('./routes/portal/portal')
 
@@ -116,6 +117,8 @@ app.use(rotaBulario);
 app.use(rotaPublicoPagamento);
 // Busca de veterinários próximos (app do responsável): pública, sem sessão.
 app.use(rotaGeoVeterinarios);
+// Atestados no app do responsável (escopo por CPF, padrão do app): pública.
+app.use(rotaAppAtestados);
 // Portal do Responsável (app mobile): auth PRÓPRIA (token de escopo 'portal', via
 // requirePortal) — NÃO o requireAuth do vet. Montado aqui, ANTES dos routers com
 // requireAuth global, senão seria barrado por eles.
