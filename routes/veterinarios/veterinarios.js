@@ -3,6 +3,7 @@ const route = express.Router();
 const models = require('../../models');
 const { mob_veterinarios, web_veterinarios, mob_protocolos_saude, mob_animais } = models;
 const { uploadFile, deleteFile, getFileStream } = require('../../utils/s3_teste');
+const { enviarImagem } = require('../../utils/imagemResposta');
 
 const bcrypt = require('bcrypt');
 const { OAuth2Client } = require('google-auth-library');
@@ -856,25 +857,10 @@ route.get('/web-veterinarios/:id/imagem/:tipo', async (req, res) => {
       return res.status(404).json({ error: `${tipo === 'logo' ? 'Logo' : 'Assinatura'} não encontrada` });
     }
     
-    // Definir headers apropriados
-    res.set({
-      'Content-Type': 'image/png', // ou image/jpeg, dependendo do formato
-      'Cache-Control': 'no-store, max-age=0' // Cache por 1 hora
-    });
-    
-    // Stream da imagem para o cliente
-    if (fileStream.pipe) {
-      fileStream.pipe(res);
-    } else {
-      // Para AWS SDK v3, o Body pode ser um ReadableStream
-      const chunks = [];
-      for await (const chunk of fileStream) {
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
-      res.send(buffer);
-    }
-    
+    // Content-Type vem dos BYTES, não fixo: as chaves no S3 não têm extensão.
+    // Mantém no-store: a tela de Perfil recarrega a logo/assinatura após upload.
+    return await enviarImagem(res, fileStream, 'no-store, max-age=0');
+
   } catch (error) {
     console.log('ERRO em /web-veterinarios/:id/imagem/:tipo');
     console.log(error.message);

@@ -126,7 +126,19 @@ async function getFileStream(Key) {
     const data = await s3.send(new GetObjectCommand(downloadParams));
     return data.Body;
   } catch (err) {
-    console.log("Error", err);
+    // Log de UMA linha, com a Key. Antes era `console.log("Error", err)`, que
+    // despejava o objeto AWS inteiro com stack trace e SEM dizer qual arquivo
+    // faltou — um 404 banal (logo do vet ainda não enviado) parecia falha grave
+    // de credencial, e para descobrir o arquivo era preciso cruzar com o log SQL.
+    // Arquivo ausente vem como AccessDenied/403, não NoSuchKey: sem
+    // `s3:ListBucket` o S3 mascara o 404 (ver o comentário em `fileExists`).
+    const status = err.$metadata && err.$metadata.httpStatusCode;
+    const ausente = err.name === 'NoSuchKey' || err.name === 'NotFound'
+      || err.name === 'AccessDenied' || status === 404 || status === 403;
+    console.log(ausente
+      ? `[s3] "${Key}" nao encontrado (${err.name}/${status}) — quem chamou deve tratar como ausente.`
+      : `[s3] falha ao baixar "${Key}": ${err.name || err.message}`);
+    // Retorno segue undefined: as rotas usam isso como "nao existe" → 404.
   }
 }
 

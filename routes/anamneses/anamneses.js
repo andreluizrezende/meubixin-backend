@@ -6,6 +6,7 @@ const Sequelize = require("sequelize");
 const env = process.env.NODE_ENV || "production";
 const config = require("../../config/config.js")[env];
 const { uploadFile, deleteFile, getFileStream, fileExists } = require("../../utils/s3_teste");
+const { enviarImagem } = require("../../utils/imagemResposta");
 
 
 let sequelize;
@@ -183,25 +184,9 @@ route.get('/feridas/:id/imagem/:imagemId', async (req, res) => {
       return res.status(404).json({ error: 'Erro ao buscar imagem' });
     }
     
-    // Definir headers apropriados
-    res.set({
-      'Content-Type': 'image/jpeg',
-      'Cache-Control': 'public, max-age=3600'
-    });
-    
-    // Stream da imagem para o cliente
-    if (fileStream.pipe) {
-      fileStream.pipe(res);
-    } else {
-      // Para AWS SDK v3
-      const chunks = [];
-      for await (const chunk of fileStream) {
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
-      res.send(buffer);
-    }
-    
+    // Content-Type vem dos BYTES, não fixo: as chaves no S3 não têm extensão.
+    return await enviarImagem(res, fileStream, 'public, max-age=3600');
+
   } catch (error) {
     console.log("ERRO em /feridas/:id/imagem/:imagemId");
     console.log(error.message);

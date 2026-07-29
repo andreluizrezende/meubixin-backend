@@ -6,6 +6,7 @@ const Op = require('sequelize').Op;
 const { sequelize } = models;
 const { uploadProfilePetService } = require('../uploadImagens/service')
 const { uploadFile, deleteFile, getFileStream, fileExists, getSignedUrlForDownload } = require("../../utils/s3_teste");
+const { enviarImagem } = require("../../utils/imagemResposta");
 
 
 
@@ -370,25 +371,9 @@ route.get('/animais/:id/imagem', async (req, res) => {
       return res.status(404).json({ error: 'Erro ao buscar imagem' });
     }
     
-    // Definir headers apropriados
-    res.set({
-      'Content-Type': 'image/jpeg', // ou image/png, dependendo do formato
-      'Cache-Control': 'public, max-age=3600' // Cache por 1 hora
-    });
-    
-    // Stream da imagem para o cliente
-    if (fileStream.pipe) {
-      fileStream.pipe(res);
-    } else {
-      // Para AWS SDK v3, o Body pode ser um ReadableStream
-      const chunks = [];
-      for await (const chunk of fileStream) {
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
-      res.send(buffer);
-    }
-    
+    // Content-Type vem dos BYTES, não fixo: as chaves no S3 não têm extensão.
+    return await enviarImagem(res, fileStream, 'public, max-age=3600');
+
   } catch (error) {
     res.status(500).json({ error: 'Erro interno do servidor' });
   }

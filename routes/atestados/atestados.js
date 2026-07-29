@@ -221,6 +221,9 @@ route.get('/atestados/:id/dados-pdf', async (req, res) => {
          a.no_nome AS animal_nome, a.ds_especie, a.ds_sexo, a.ds_pelagem,
          a.vl_idade, a.vl_peso,
          pp.ds_raca, pp.dt_nascimento, pp.ds_porte, pp.st_castrado, pp.ds_doencas_cronicas,
+         -- Identificação exigida pelos Anexos I/II/XI (Res. CFMV 1.321/2020).
+         pp.ds_sinais_particulares, pp.ds_tatuagem, pp.ds_brinco,
+         pp.nu_microchip, pp.ds_registro_genealogico, pp.ds_resenha,
          t.id AS tutor_id, t.no_completo AS tutor_nome, t.nu_cpf AS tutor_cpf,
          t.ds_email AS tutor_email, t.nu_telefone_completo AS tutor_telefone,
          tp.ds_logradouro AS tutor_logradouro, tp.nu_numero AS tutor_numero,

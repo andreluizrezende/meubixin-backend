@@ -183,8 +183,15 @@ route.get('/retencao/pet-perfil/:animalId', async (req, res) => {
 route.put('/retencao/pet-perfil/:animalId', async (req, res) => {
   try {
     const mob_animais_id = Number(req.params.animalId);
-    const { dt_nascimento, ds_raca, ds_doencas_cronicas, ds_porte, st_castrado } = req.body;
+    const {
+      dt_nascimento, ds_raca, ds_doencas_cronicas, ds_porte, st_castrado,
+      // Identificação exigida pelos anexos da Res. CFMV 1.321/2020.
+      ds_sinais_particulares, ds_tatuagem, ds_brinco, nu_microchip,
+      ds_registro_genealogico, ds_resenha,
+    } = req.body;
     const existente = await WebPetPerfil.findOne({ where: { mob_animais_id } });
+    // `|| null` em tudo: string vazia do form não deve virar "" no banco, senão
+    // o gerador de PDF imprime o rótulo com o valor em branco.
     const dados = {
       mob_animais_id,
       dt_nascimento: dt_nascimento || null,
@@ -192,6 +199,12 @@ route.put('/retencao/pet-perfil/:animalId', async (req, res) => {
       ds_doencas_cronicas: ds_doencas_cronicas || null,
       ds_porte: ds_porte || null,
       st_castrado: st_castrado != null ? Number(st_castrado) : null,
+      ds_sinais_particulares: ds_sinais_particulares || null,
+      ds_tatuagem: ds_tatuagem || null,
+      ds_brinco: ds_brinco || null,
+      nu_microchip: nu_microchip || null,
+      ds_registro_genealogico: ds_registro_genealogico || null,
+      ds_resenha: ds_resenha || null,
     };
     if (existente) await existente.update(dados);
     else await WebPetPerfil.create(dados);
