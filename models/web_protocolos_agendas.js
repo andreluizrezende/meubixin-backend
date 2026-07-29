@@ -35,6 +35,18 @@ module.exports = (sequelize, DataTypes) => {
       ds_caminho_server: {
         type: DataTypes.STRING(255),
         allowNull: true
+      },
+      // Imunobiológico aplicado — conteúdo do atestado/carteira de vacinação
+      // (Resolução CFMV 1.321/2020). Nulos nas doses registradas antes disso.
+      ds_lote: { type: DataTypes.STRING(60), allowNull: true },
+      ds_fabricante: { type: DataTypes.STRING(120), allowNull: true },
+      dt_validade_vacina: { type: DataTypes.DATEONLY, allowNull: true },
+      ds_via_aplicacao: { type: DataTypes.STRING(60), allowNull: true },
+      // Quem APLICOU (pode não ser quem assina o atestado)
+      web_veterinarios_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: { model: 'web_veterinarios', key: 'id' }
       }
     },
     {

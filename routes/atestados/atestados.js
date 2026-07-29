@@ -241,10 +241,14 @@ route.get('/atestados/:id/dados-pdf', async (req, res) => {
     if (['vacinacao', 'carteira_vacinacao'].includes(atestado.tp_atestado)) {
       vacinas = await sequelize.query(
         `SELECT ag.id, ag.dt_data_aplicacao, ag.st_concluido,
-                COALESCE(p.nome_protocolo, ps.ds_protocolos_saude) AS nome_protocolo
+                ag.ds_lote, ag.ds_fabricante, ag.dt_validade_vacina, ag.ds_via_aplicacao,
+                COALESCE(p.nome_protocolo, ps.ds_protocolos_saude) AS nome_protocolo,
+                va.no_completo AS aplicador_nome, va.nu_crmv AS aplicador_crmv,
+                va.ds_estado_crmv AS aplicador_uf
            FROM web_protocolos_agendas ag
            JOIN web_protocolos p ON p.id = ag.web_protocolos_id
            LEFT JOIN web_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
+           LEFT JOIN web_veterinarios va ON va.id = ag.web_veterinarios_id
            JOIN web_anamneses an ON an.id = p.web_anamneses_id
           WHERE an.mob_animais_id = :animalId AND p.st_tipo_protocolo = 0
           ORDER BY ag.dt_data_aplicacao DESC`,
