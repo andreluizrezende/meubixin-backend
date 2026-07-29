@@ -2,8 +2,23 @@ const express = require("express");
 const route = express.Router();
 const upload = require("../../utils/multer");
 const {
-  listBuckets,
-  createBucketlistFileStream,
+  // ┌─────────────────────────────────────────────────────────────────────────┐
+  // │ CÓDIGO MORTO E QUEBRADO — REMOVER A PARTIR DE 15/08/2026                │
+  // ├─────────────────────────────────────────────────────────────────────────┤
+  // │ Faltava uma VÍRGULA entre `createBucket` e `listFileStream`: o import   │
+  // │ virava o identificador único `createBucketlistFileStream`, e os dois    │
+  // │ nomes ficavam INDEFINIDOS. As rotas que os usavam                       │
+  // │ (`GET /upload`, `POST /uploadCreateBucket`) lançavam ReferenceError —   │
+  // │ nunca funcionaram. `listBuckets` importava certo, mas a rota é          │
+  // │ administrativa e falharia com AccessDenied (o usuário IAM atual não tem │
+  // │ `s3:ListBucket`). As 3 rotas estão comentadas mais abaixo.              │
+  // │                                                                         │
+  // │ `deleteFile` NÃO é morto: sustenta o `DELETE /upload/:key`, que o APP   │
+  // │ (`m-cicatribiovet`) chama ao excluir imagem de ferida. Rota distinta do │
+  // │ `GET /upload` comentado — não confundir.                                │
+  // └─────────────────────────────────────────────────────────────────────────┘
+  // listBuckets,
+  // createBucketlistFileStream,
   deleteFile,
 } = require("../../utils/s3");
 const { uploadFile, getFileStream } = require("../../utils/s3_teste");
@@ -59,9 +74,12 @@ route.get("/upload/:key", async (req, res) => {
   }
 });
 
-route.get("/upload", (req, res) => {
-  return res.send(listFileStream());
-});
+// CÓDIGO MORTO — remover a partir de 15/08/2026 (ver bloco no import).
+// `listFileStream` nunca chegou a ser importado (vírgula faltando) → esta rota
+// sempre lançou ReferenceError.
+// route.get("/upload", (req, res) => {
+//   return res.send(listFileStream());
+// });
 
 route.post("/upload", upload.single("img"), async (req, res) => {
   try {
@@ -166,13 +184,17 @@ route.delete("/upload/:key", async (req, res) => {
   }
 });
 
-route.get("/uploadListeningBucket", async (req, res) => {
-  return res.send(listBuckets());
-});
-
-route.post("/uploadCreateBucket", async (req, res) => {
-  const { name } = req.body;
-  return res.send(createBucket(name));
-});
+// CÓDIGO MORTO — remover a partir de 15/08/2026 (ver bloco no import).
+// Rotas administrativas de bucket, sem consumidor no frontend nem no app.
+// `createBucket` nunca foi importado → ReferenceError; `listBuckets` responderia
+// AccessDenied com as credenciais IAM atuais.
+// route.get("/uploadListeningBucket", async (req, res) => {
+//   return res.send(listBuckets());
+// });
+//
+// route.post("/uploadCreateBucket", async (req, res) => {
+//   const { name } = req.body;
+//   return res.send(createBucket(name));
+// });
 
 module.exports = route;

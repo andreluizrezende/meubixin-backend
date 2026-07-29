@@ -4,8 +4,9 @@ const {
   PutObjectCommand, 
   ListBucketsCommand, 
   CreateBucketCommand, 
-  GetObjectCommand, 
-  ListObjectsCommand, 
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsCommand,
   DeleteObjectCommand
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
@@ -139,22 +140,38 @@ async function listFileStream() {
   }
 }
 
+// Existência de um objeto no S3.
+//
+// ⚠️ Com as credenciais atuais, chave INEXISTENTE **não** devolve `NoSuchKey`:
+// o usuário IAM não tem `s3:ListBucket` e, nesse caso, o S3 responde
+// `AccessDenied` (403) de propósito, para não revelar se o objeto existe.
+// Tratar só `NoSuchKey` como "não existe" fazia toda imagem ausente virar
+// exceção, e as rotas que chamam esta função devolviam **500** no lugar do 404
+// que o código logo abaixo delas pretendia retornar (pet sem foto = 500).
+//
+// HeadObject no lugar de GetObject: mesma permissão exigida, sem baixar o corpo
+// do arquivo — quem chama faz o `getFileStream` depois, só se existir.
 async function fileExists(Key) {
-  const params = {
-    Bucket,
-    Key
-  };
-  
   try {
-    // Tentar obter o objeto - se não existir, vai lançar uma exceção
-    await s3.send(new GetObjectCommand(params));
+    await s3.send(new HeadObjectCommand({ Bucket, Key }));
     return true;
   } catch (err) {
-    if (err.name === 'NoSuchKey') {
+    const status = err.$metadata && err.$metadata.httpStatusCode;
+
+    if (err.name === 'NotFound' || err.name === 'NoSuchKey' || status === 404) {
       return false;
     }
-    // Se for outro tipo de erro, relançar
-    console.log("Erro ao verificar existência do arquivo:", err);
+
+    // 403 é ambíguo: pode ser objeto ausente (mascarado pela falta de
+    // `s3:ListBucket`) OU credencial sem acesso de verdade. Respondemos
+    // "não existe" para a rota devolver 404, mas registramos uma linha — com a
+    // Key — para um problema real de IAM não passar despercebido.
+    if (err.name === 'AccessDenied' || status === 403) {
+      console.log(`[s3] AccessDenied em HeadObject "${Key}" — tratado como inexistente (sem s3:ListBucket, o S3 mascara o 404).`);
+      return false;
+    }
+
+    console.log(`[s3] Erro ao verificar existência de "${Key}":`, err.name || err.message);
     throw err;
   }
 }
