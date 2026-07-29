@@ -9,6 +9,8 @@ module.exports = (sequelize, DataTypes) => {
       web_veterinarios_id: { type: DataTypes.INTEGER, allowNull: false, references: { model: 'web_veterinarios', key: 'id' } },
       mob_animais_id: { type: DataTypes.INTEGER, allowNull: true },
       mob_tutores_id: { type: DataTypes.INTEGER, allowNull: true },
+      // Campanha que gerou o envio. Nulo nos gatilhos fixos (não são registro).
+      web_campanhas_id: { type: DataTypes.INTEGER, allowNull: true, references: { model: 'web_campanhas', key: 'id' } },
       tp_gatilho: { type: DataTypes.STRING(30), allowNull: false },
       canal: { type: DataTypes.STRING(15), allowNull: false },
       ds_titulo: { type: DataTypes.STRING(255), allowNull: true },

@@ -10,7 +10,7 @@
  */
 const { QueryTypes } = require('sequelize');
 const models = require('../models');
-const { WebCampanhaEnvios, WebConsentimento, sequelize } = models;
+const { WebCampanhaEnvios, WebCampanhas, WebConsentimento, sequelize } = models;
 const { enviarEmail, enviarWhatsApp } = require('./notificacoes');
 
 const MARKETING = new Set(['inativo', 'aniversario', 'checkup_idoso', 'campanha']);
@@ -266,6 +266,18 @@ async function criarCampanhaCustom({ vetId, filtros, mensagem, nome, descricao }
   const agora = new Date();
   const nomeCampanha = (nome && String(nome).trim()) ? String(nome).trim().slice(0, 255) : 'Campanha';
   const desc = (descricao && String(descricao).trim()) ? String(descricao).trim() : null;
+
+  // A DEFINIÇÃO da campanha é gravada antes dos envios: é ela que aparece na
+  // tela "Criar gatilho / campanha" e é o que o vet apaga. Os gatilhos fixos
+  // não têm registro equivalente — são código — e por isso não são apagáveis.
+  const campanha = await WebCampanhas.create({
+    web_veterinarios_id: vetId,
+    ds_nome: nomeCampanha,
+    ds_descricao: desc,
+    ds_mensagem: mensagem && mensagem.trim() ? String(mensagem).trim() : null,
+    ds_filtros: filtros ? JSON.stringify(filtros) : null,
+  });
+
   const linhas = [];
   for (const c of cands) {
     const canais = canaisPermitidos(c, 'campanha', consMap);
@@ -273,6 +285,7 @@ async function criarCampanhaCustom({ vetId, filtros, mensagem, nome, descricao }
     for (const canal of canais) {
       linhas.push({
         web_veterinarios_id: vetId, mob_animais_id: c.mob_animais_id, mob_tutores_id: c.mob_tutores_id || null,
+        web_campanhas_id: campanha.id,
         tp_gatilho: 'campanha', canal, ds_titulo: nomeCampanha, ds_descricao: desc, ds_mensagem: msg,
         dt_agendado_para: agora, st_status: 'pendente', ds_chave_dedup: `campanha:${nonce}:${c.mob_animais_id}:${canal}`,
       });
@@ -284,7 +297,7 @@ async function criarCampanhaCustom({ vetId, filtros, mensagem, nome, descricao }
     await WebCampanhaEnvios.bulkCreate(linhas, { ignoreDuplicates: true });
     gerados = (await WebCampanhaEnvios.count({ where: { web_veterinarios_id: vetId } })) - antes;
   }
-  return { candidatos: cands.length, gerados };
+  return { candidatos: cands.length, gerados, campanhaId: campanha.id };
 }
 
 // ---- mensagens por gatilho ----

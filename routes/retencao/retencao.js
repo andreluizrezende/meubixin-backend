@@ -3,7 +3,7 @@ const express = require('express');
 const route = express.Router();
 const { QueryTypes } = require('sequelize');
 const models = require('../../models');
-const { WebPetPerfil, WebConsentimento, WebTutorPerfil, sequelize } = models;
+const { WebPetPerfil, WebConsentimento, WebTutorPerfil, WebCampanhas, WebCampanhaEnvios, sequelize } = models;
 const requireAuth = require('../../middleware/requireAuth');
 const { gerarGatilhos, processarCampanhas, previewGatilho, gerarGatilho, previewCampanha, criarCampanhaCustom } = require('../../utils/retencao');
 
@@ -12,9 +12,66 @@ const TIPOS_GATILHO = ['inativo', 'aniversario', 'checkup_idoso', 'pos_atendimen
 // Todas exigem sessão; identidade = req.vetId. Montado por ÚLTIMO no index.js.
 route.use(requireAuth);
 
-// GET /retencao/campanhas — fila de envios de retenção deste vet.
+// GET /retencao/campanhas-salvas — campanhas CRIADAS pelo vet (as apagáveis).
+// Registrada antes de /retencao/campanhas? Não há colisão: os caminhos são
+// distintos e exatos. Traz a contagem de envios para a tela mostrar o impacto
+// de apagar (só os pendentes somem; o que já foi enviado vira histórico).
+route.get('/retencao/campanhas-salvas', async (req, res) => {
+  try {
+    const linhas = await sequelize.query(
+      `SELECT c.id, c.ds_nome, c.ds_descricao, c.ds_mensagem, c.ds_filtros, c.createdAt,
+              (SELECT COUNT(*) FROM web_campanha_envios e WHERE e.web_campanhas_id = c.id) AS qt_envios,
+              (SELECT COUNT(*) FROM web_campanha_envios e WHERE e.web_campanhas_id = c.id AND e.st_status = 'pendente') AS qt_pendentes,
+              (SELECT COUNT(*) FROM web_campanha_envios e WHERE e.web_campanhas_id = c.id AND e.st_status = 'enviado') AS qt_enviados
+         FROM web_campanhas c
+        WHERE c.web_veterinarios_id = :vetId
+        ORDER BY c.createdAt DESC, c.id DESC
+        LIMIT 100`,
+      { replacements: { vetId: req.vetId }, type: QueryTypes.SELECT }
+    );
+    return res.json({ success: true, itens: linhas });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao listar campanhas salvas: ' + err.message });
+  }
+});
+
+// DELETE /retencao/campanhas-salvas/:id — apaga uma campanha do vet.
+// Os envios ainda PENDENTES são removidos (é o que impede o disparo); os já
+// enviados/com erro são preservados como histórico, só perdem o vínculo.
+route.delete('/retencao/campanhas-salvas/:id', async (req, res) => {
+  try {
+    const camp = await WebCampanhas.findOne({
+      where: { id: req.params.id, web_veterinarios_id: req.vetId },
+    });
+    if (!camp) return res.status(404).json({ success: false, message: 'Campanha não encontrada.' });
+
+    const removidos = await WebCampanhaEnvios.destroy({
+      where: { web_campanhas_id: camp.id, st_status: 'pendente' },
+    });
+    await WebCampanhaEnvios.update(
+      { web_campanhas_id: null },
+      { where: { web_campanhas_id: camp.id } }
+    );
+    await camp.destroy();
+
+    return res.json({ success: true, pendentesRemovidos: removidos });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Erro ao apagar campanha: ' + err.message });
+  }
+});
+
+// GET /retencao/campanhas?de=&ate= — fila de envios de retenção deste vet.
+// O período é OPCIONAL (sem ele, devolve tudo — comportamento antigo) e filtra
+// por `dt_agendado_para`, não por `dt_enviado`: o pendente ainda não tem data de
+// envio e sumiria do recorte justamente quando é ele que precisa de atenção.
+// O filtro é feito aqui, e não na tela, porque o LIMIT 200 e os KPIs saem desta
+// mesma consulta — filtrar depois daria contagem e lista truncadas.
 route.get('/retencao/campanhas', async (req, res) => {
   try {
+    const { de, ate } = req.query;
+    const temPeriodo = Boolean(de && ate);
+    const filtroPeriodo = temPeriodo ? 'AND ce.dt_agendado_para BETWEEN :de AND :ate' : '';
+
     const linhas = await sequelize.query(
       `SELECT ce.id, ce.tp_gatilho, ce.canal, ce.ds_titulo, ce.ds_descricao, ce.dt_agendado_para,
               ce.dt_enviado, ce.st_status, ce.ds_erro, an.no_nome AS animal_nome,
@@ -23,9 +80,16 @@ route.get('/retencao/campanhas', async (req, res) => {
          JOIN mob_animais an ON an.id = ce.mob_animais_id
          LEFT JOIN mob_tutores t ON t.id = ce.mob_tutores_id
         WHERE ce.web_veterinarios_id = :vetId
+          ${filtroPeriodo}
         ORDER BY ce.createdAt DESC, ce.id DESC
         LIMIT 200`,
-      { replacements: { vetId: req.vetId }, type: QueryTypes.SELECT }
+      {
+        replacements: {
+          vetId: req.vetId,
+          ...(temPeriodo ? { de: new Date(de), ate: new Date(ate) } : {})
+        },
+        type: QueryTypes.SELECT
+      }
     );
     // KPIs simples por status
     const kpis = linhas.reduce((a, l) => { a[l.st_status] = (a[l.st_status] || 0) + 1; return a; }, {});
