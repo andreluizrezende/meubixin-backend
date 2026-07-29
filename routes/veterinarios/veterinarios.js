@@ -617,6 +617,43 @@ route.get('/web-veterinarios/:id', async (req, res) => {
   }
 });
 
+// Campos que compõem o endereço geocodificável. Mudou algum → recalcula.
+const CAMPOS_ENDERECO = ['ds_logradouro', 'nu_numero', 'ds_bairro', 'ds_cidade', 'ds_uf', 'nu_cep'];
+
+async function geocodificarSeNecessario(id, antes, alterado) {
+  try {
+    // Coordenada enviada explicitamente (ajuste manual do pino) tem prioridade
+    // sobre a geocodificação automática — o vet sabe melhor onde ele está.
+    if (alterado.nu_latitude != null && alterado.nu_longitude != null) {
+      await web_veterinarios.update({ dt_geocodificado: new Date() }, { where: { id } });
+      return;
+    }
+
+    const mudou = CAMPOS_ENDERECO.some(
+      (c) => c in alterado && String(alterado[c] ?? '') !== String(antes[c] ?? '')
+    );
+    const semCoordenada = antes.nu_latitude == null || antes.nu_longitude == null;
+    if (!mudou && !semCoordenada) return;
+
+    // Usa o endereço já persistido (o update acabou de rodar).
+    const atual = await web_veterinarios.findByPk(id);
+    const { geocodificar } = require('../../utils/geocodificacao');
+    const ponto = await geocodificar(atual);
+    if (!ponto) {
+      console.warn('[geo] sem coordenada para o veterinário', id);
+      return;
+    }
+    await web_veterinarios.update({
+      nu_latitude: ponto.latitude,
+      nu_longitude: ponto.longitude,
+      dt_geocodificado: new Date(),
+    }, { where: { id } });
+    console.log('[geo] veterinário', id, '->', ponto.latitude, ponto.longitude, ponto.aproximado ? '(aproximado)' : '(exato)');
+  } catch (e) {
+    console.warn('[geo] falhou para o veterinário', id, '-', e.message);
+  }
+}
+
 route.put('/web-veterinarios/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -638,7 +675,16 @@ route.put('/web-veterinarios/:id', async (req, res) => {
     
     // Atualizar dados
     await web_veterinarios.update(dadosAtualizacao, { where: { id } });
-    
+
+    // Geocodificação do endereço profissional (busca de veterinários próximos).
+    // Roda DEPOIS do update e só quando o endereço mudou — geocodificar a cada
+    // salvamento desperdiçaria a cota do Nominatim sem necessidade.
+    // É awaited de propósito: em serverless (Vercel) a função pode ser encerrada
+    // logo após a resposta, então "fire-and-forget" não completaria.
+    // Falha nunca bloqueia o salvamento: o vet fica sem coordenada e não aparece
+    // no mapa até corrigir o endereço.
+    await geocodificarSeNecessario(id, veterinarioExistente, dadosAtualizacao);
+
     // ✅ Buscar dados atualizados para retornar
     const veterinarioAtualizado = await web_veterinarios.findByPk(id, {
       attributes: { exclude: ['ds_senha'] }

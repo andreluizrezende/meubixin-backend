@@ -77,6 +77,13 @@ module.exports = (sequelize, DataTypes) => {
     ds_clinica_nome: { type: DataTypes.STRING(255), allowNull: true },
     nu_clinica_cnpj: { type: DataTypes.STRING(18), allowNull: true },
     nu_clinica_crmv_pj: { type: DataTypes.STRING(30), allowNull: true },
+    // Geolocalização (busca de veterinários próximos no app do responsável).
+    // Mesmo formato decimal de web_parceiros. st_atende_domicilio é OPT-IN.
+    nu_latitude: { type: DataTypes.DECIMAL(10, 8), allowNull: true },
+    nu_longitude: { type: DataTypes.DECIMAL(11, 8), allowNull: true },
+    dt_geocodificado: { type: DataTypes.DATE, allowNull: true },
+    st_atende_domicilio: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    nu_raio_km: { type: DataTypes.INTEGER, allowNull: true },
     stripe_connect_account_id: {
       type: DataTypes.STRING(255),
       allowNull: true,
