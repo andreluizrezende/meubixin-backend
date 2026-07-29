@@ -1,3 +1,14 @@
+/*
+ * ┌───────────────────────────────────────────────────────────────────────────┐
+ * │ SEM USO — REMOVER A PARTIR DE 15/08/2026                                  │
+ * ├───────────────────────────────────────────────────────────────────────────┤
+ * │ Este Worker NUNCA foi publicado. Desde 29/07/2026 o cron roda em GitHub   │
+ * │ Actions (`.github/workflows/cron-workers.yml`, no repo do WEB), validado  │
+ * │ em produção. Ver o README desta pasta para o porquê da escolha e para o   │
+ * │ cenário em que vale voltar para cá.                                       │
+ * └───────────────────────────────────────────────────────────────────────────┘
+ */
+
 /**
  * Cron do Meu Bixin — Cloudflare Worker.
  *

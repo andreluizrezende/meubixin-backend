@@ -1,3 +1,26 @@
+> # ⚠️ SEM USO — REMOVER A PARTIR DE 15/08/2026
+>
+> **A Fase 2e foi fechada por outro caminho.** Desde 29/07/2026 o cron roda em
+> **GitHub Actions**, pelo workflow `.github/workflows/cron-workers.yml` do repo
+> do **web** (`cicatribiovet-web`), já validado em produção. Este Worker nunca
+> chegou a ser publicado.
+>
+> **Por que o Actions ganhou:** não exige conta na Cloudflare nem `wrangler`, e o
+> código já vive no GitHub — um passo de infraestrutura a menos para manter.
+>
+> **Por que o workflow não ficou no repo do backend:** `on: schedule` só dispara
+> a partir da branch PADRÃO do repositório, e aqui a padrão é
+> `não-veterinários-versão-2.0`, enquanto produção sai da `server`. Um workflow
+> commitado neste repo nunca rodaria — e falharia em silêncio.
+>
+> **Antes de apagar esta pasta**, confira se o cron do Actions continua de pé.
+> Este é o plano B: se a cadência do Actions atrasar demais (o GitHub não garante
+> pontualidade e desativa workflows agendados após 60 dias sem atividade no
+> repositório), os Cron Triggers da Cloudflare são disparo dedicado e pontual.
+>
+> Diferença de cadência entre os dois, se for retomar: aqui a retenção era de
+> hora em hora; no Actions ficou 1×/dia às 09:00 BRT, por ser marketing.
+
 # Cron do Meu Bixin (Cloudflare Worker)
 
 Fecha a **Fase 2e**: dispara automaticamente os lembretes da agenda e as campanhas

@@ -1,3 +1,7 @@
+# ⚠️ SEM USO — REMOVER A PARTIR DE 15/08/2026.
+# Nunca publicado: o cron roda em GitHub Actions desde 29/07/2026
+# (.github/workflows/cron-workers.yml, no repo do web). Ver o README desta pasta.
+
 name = "meubixin-cron"
 main = "src/index.js"
 compatibility_date = "2026-07-28"
