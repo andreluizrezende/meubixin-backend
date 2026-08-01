@@ -68,6 +68,7 @@ const rotaLembretes = require('./routes/agenda/lembretes')
 const rotaRetencao = require('./routes/retencao/retencao')
 const rotaAtestados = require('./routes/atestados/atestados')
 const rotaTermos = require('./routes/termos/termos')
+const rotaAnexosProntuario = require('./routes/anexos/anexos')
 const rotaGeoVeterinarios = require('./routes/geo/veterinarios')
 const rotaAppAtestados = require('./routes/app/atestados')
 const rotaRetencaoWorker = require('./routes/retencao/retencaoWorker')
@@ -139,6 +140,8 @@ app.use(rotaRetencao);
 app.use(rotaAtestados);
 // Termos de consentimento: mesmo caso do atestado (requireAuth sem path).
 app.use(rotaTermos);
+// Anexos de laudo do prontuário: idem (requireAuth sem path) → por último.
+app.use(rotaAnexosProntuario);
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`running on port: ${PORT}`))
