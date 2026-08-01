@@ -1,0 +1,40 @@
+# CI do BACKEND: testes a cada push/PR.
+#
+# ⚠️ Este workflow PODE morar aqui, ao contrário do cron dos motores: a restrição
+# de "só roda na branch padrão" vale apenas para `on: schedule`. `on: push` roda a
+# partir da branch empurrada, e produção sai da `server` — por isso ela está
+# listada abaixo junto da padrão do repositório.
+#
+# Os testes NÃO tocam o banco: cobrem lógica pura (montagem das mensagens de
+# lembrete, com foco em regressão de fuso). Por isso não há serviço de MySQL nem
+# variáveis de ambiente de banco aqui.
+
+name: CI
+
+on:
+  push:
+    branches:
+      - server                        # branch de PRODUÇÃO
+      - não-veterinários-versão-2.0   # branch padrão do repositório
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # TZ=UTC vem do vitest.config.js, de propósito: o runner e a Vercel rodam em
+      # UTC, e esta base já shipou dois bugs de fuso que não reproduziam em -03:00.
+      - name: Testes
+        run: npm test
