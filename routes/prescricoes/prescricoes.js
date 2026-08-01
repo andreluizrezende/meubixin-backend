@@ -358,12 +358,21 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
 
       for (let agendaIdx = 0; agendaIdx < agendasProtocolo.length; agendaIdx++) {
         const agenda = agendasProtocolo[agendaIdx];
-        const stConcluido = statusDosesProtocolo[agendaIdx]?.st_concluido === 1 ? 1 : 0;
+        const doseEnviada = statusDosesProtocolo[agendaIdx] || {};
+        const stConcluido = doseEnviada.st_concluido === 1 ? 1 : 0;
 
+        // Dados do imunobiológico (Anexos XI/XII do CFMV: lote/nº da partida,
+        // fabricante, validade e via). A edição APAGA e RECRIA as agendas, então
+        // o que não vier no payload se perde — o front reenvia sempre o que já
+        // tinha. `|| null` para string vazia não virar '' e imprimir rótulo vazio.
         const agendaCriada = await WebProtocolosAgendas.create({
           web_protocolos_id: protocoloCriado.id,
           dt_data_aplicacao: agenda.dt_data_aplicacao,
-          st_concluido: stConcluido
+          st_concluido: stConcluido,
+          ds_lote: doseEnviada.ds_lote || null,
+          ds_fabricante: doseEnviada.ds_fabricante || null,
+          dt_validade_vacina: doseEnviada.dt_validade_vacina || null,
+          ds_via_aplicacao: doseEnviada.ds_via_aplicacao || null
         }, { transaction });
 
         agendasCriadas.push(agendaCriada);
