@@ -25,12 +25,19 @@ route.use(requireAuth);
 
 const TIPOS_VALIDOS = ['laboratorial', 'imagem', 'outro'];
 
-// PDF e imagens: é o que sai de laboratório e de aparelho de imagem. 15 MB porque
-// laudo de imagem escaneado passa fácil dos 10 MB dos anexos de cobrança.
+// PDF e imagens: é o que sai de laboratório e de aparelho de imagem.
+//
+// ⚠️ 4 MB, NÃO um número escolhido por conforto: a **Vercel Serverless corta em
+// 4,5 MB por corpo de requisição** e o limite não é configurável (ver os gotchas
+// de produção no CLAUDE.md). Passar disso faz a requisição morrer NA PLATAFORMA,
+// antes de chegar no multer — o vet veria erro de rede genérico em vez da
+// mensagem amigável, e só em produção: local funcionaria. Os 500 KB de folga
+// cobrem o overhead do multipart (boundaries + headers dos campos de metadado).
+const MAX_MB = 4;
 const MIMES = ['application/pdf', 'image/png', 'image/jpg', 'image/jpeg', 'image/webp'];
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 },
+  limits: { fileSize: MAX_MB * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (MIMES.includes(file.mimetype)) return cb(null, true);
     cb(new Error('Formato não aceito. Envie PDF ou imagem (PNG/JPG/WEBP).'));
@@ -45,7 +52,7 @@ const receberArquivo = (req, res, next) => {
   upload.single('arquivo')(req, res, (err) => {
     if (!err) return next();
     const msg = err.code === 'LIMIT_FILE_SIZE'
-      ? 'Arquivo acima do limite de 15 MB.'
+      ? `Arquivo acima do limite de ${MAX_MB} MB. Reduza a resolução do documento e tente de novo.`
       : (err.message || 'Arquivo inválido.');
     return res.status(400).json({ success: false, message: msg });
   });
