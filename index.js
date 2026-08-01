@@ -23,6 +23,7 @@ app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
 // routes
 const rotaInicial = require('./routes/initial');
+const rotaVersao = require('./routes/versao');
 const rotaUsuarios = require('./routes/usuarios/usuarios');
 const rotaLocalFeridas = require('./routes/tabelasControle/localFeridas');
 const rotaQtdExsudatos = require('./routes/tabelasControle/qtdExsudatos');
@@ -76,6 +77,9 @@ const rotaPortal = require('./routes/portal/portal')
 
 app.use('/admin', adminRoutes);
 app.use(rotaInicial);
+// Pública e montada cedo: a tela de LOGIN a consulta, sem sessão. Depois dos
+// routers com requireAuth sem path ela levaria 401.
+app.use(rotaVersao);
 app.use(rotaUsuarios);
 app.use(rotaLocalFeridas);
 app.use(rotaQtdExsudatos);
