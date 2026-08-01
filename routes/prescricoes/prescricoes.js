@@ -1225,6 +1225,19 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
         v.ds_estado_crmv,
         v.ds_email,
         v.nu_telefone_completo,
+        -- Endereço do MV e do responsável: conteúdo mínimo da Res. CFMV
+        -- 1.321/2020 (alterada pela 1.653/2025). Mesmas colunas que o
+        -- dados-pdf dos atestados já usa — ver routes/atestados/atestados.js.
+        v.ds_logradouro AS vet_logradouro,
+        v.nu_numero AS vet_numero,
+        v.ds_complemento AS vet_complemento,
+        v.ds_bairro AS vet_bairro,
+        v.ds_cidade AS vet_cidade,
+        v.ds_uf AS vet_uf,
+        v.nu_cep AS vet_cep,
+        v.ds_clinica_nome,
+        v.nu_clinica_cnpj,
+        v.nu_clinica_crmv_pj,
         an.no_nome,
         an.ds_especie,
         an.ds_sexo,
@@ -1237,7 +1250,14 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
         pp.ds_doencas_cronicas AS pet_doencas,
         t.no_completo AS tutor_nome,
         t.nu_cpf AS tutor_cpf,
-        t.nu_telefone_completo AS tutor_telefone
+        t.nu_telefone_completo AS tutor_telefone,
+        tp.ds_logradouro AS tutor_logradouro,
+        tp.nu_numero AS tutor_numero,
+        tp.ds_complemento AS tutor_complemento,
+        tp.ds_bairro AS tutor_bairro,
+        tp.ds_cidade AS tutor_cidade,
+        tp.ds_uf AS tutor_uf,
+        tp.nu_cep AS tutor_cep
       FROM web_anamneses a
       LEFT JOIN web_protocolos p ON p.web_anamneses_id = a.id
       LEFT JOIN mob_protocolos_saude ps ON ps.id = p.web_protocolos_saude_id
@@ -1245,6 +1265,7 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
       INNER JOIN mob_animais an ON an.id = a.mob_animais_id
       LEFT JOIN web_pet_perfil pp ON pp.mob_animais_id = an.id
       INNER JOIN mob_tutores t ON t.id = an.mob_tutores_id
+      LEFT JOIN web_tutor_perfil tp ON tp.mob_tutores_id = t.id
       WHERE a.id = :anamneseId
     `;
 
@@ -1281,7 +1302,17 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
       nu_crmv: primeiraLinha.nu_crmv,
       ds_estado_crmv: primeiraLinha.ds_estado_crmv,
       ds_email: primeiraLinha.ds_email,
-      nu_telefone_completo: primeiraLinha.nu_telefone_completo
+      nu_telefone_completo: primeiraLinha.nu_telefone_completo,
+      ds_logradouro: primeiraLinha.vet_logradouro || null,
+      nu_numero: primeiraLinha.vet_numero || null,
+      ds_complemento: primeiraLinha.vet_complemento || null,
+      ds_bairro: primeiraLinha.vet_bairro || null,
+      ds_cidade: primeiraLinha.vet_cidade || null,
+      ds_uf: primeiraLinha.vet_uf || null,
+      nu_cep: primeiraLinha.vet_cep || null,
+      ds_clinica_nome: primeiraLinha.ds_clinica_nome || null,
+      nu_clinica_cnpj: primeiraLinha.nu_clinica_cnpj || null,
+      nu_clinica_crmv_pj: primeiraLinha.nu_clinica_crmv_pj || null
     };
 
     const animal = {
@@ -1300,7 +1331,14 @@ route.get('/prescricoes/:anamneseId/dados-pdf', async (req, res) => {
     const tutor = {
       no_completo: primeiraLinha.tutor_nome,
       nu_cpf: primeiraLinha.tutor_cpf,
-      nu_telefone_completo: primeiraLinha.tutor_telefone
+      nu_telefone_completo: primeiraLinha.tutor_telefone,
+      ds_logradouro: primeiraLinha.tutor_logradouro || null,
+      nu_numero: primeiraLinha.tutor_numero || null,
+      ds_complemento: primeiraLinha.tutor_complemento || null,
+      ds_bairro: primeiraLinha.tutor_bairro || null,
+      ds_cidade: primeiraLinha.tutor_cidade || null,
+      ds_uf: primeiraLinha.tutor_uf || null,
+      nu_cep: primeiraLinha.tutor_cep || null
     };
 
     const protocolosMap = {};
