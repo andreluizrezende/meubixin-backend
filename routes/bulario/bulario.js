@@ -302,6 +302,9 @@ route.get('/produtos-veterinarios', async (req, res) => {
       via: r.via,
       porte: r.porte,
       link: r.link,
+      // Marca do catálogo: a aba Vacinas usa como fonte autoritativa para o
+      // checkbox "Antirrábica" (a heurística de nome é só o fallback).
+      stAntirrabica: !!r.st_antirrabica,
     }));
     return res.json({ itens });
   } catch (err) {
