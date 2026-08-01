@@ -163,6 +163,7 @@ route.post('/prescricoes', async (req, res) => {
         web_protocolos_saude_id: protocolo.web_protocolos_saude_id,
         nome_protocolo: protocolo.nome_protocolo || null,
         st_uso_humano: !!protocolo.st_uso_humano,
+        st_antirrabica: !!protocolo.st_antirrabica,
         ds_concentracao: protocolo.ds_concentracao || null,
         ds_forma_farmaceutica: protocolo.ds_forma_farmaceutica || null,
         ds_quantidade: protocolo.ds_quantidade || null,
@@ -329,6 +330,7 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
         web_protocolos_saude_id: protocolo.web_protocolos_saude_id,
         nome_protocolo: protocolo.nome_protocolo || null,
         st_uso_humano: !!protocolo.st_uso_humano,
+        st_antirrabica: !!protocolo.st_antirrabica,
         ds_concentracao: protocolo.ds_concentracao || null,
         ds_forma_farmaceutica: protocolo.ds_forma_farmaceutica || null,
         ds_quantidade: protocolo.ds_quantidade || null,
@@ -372,6 +374,7 @@ route.put('/prescricoes/:anamneseId', async (req, res) => {
           ds_lote: doseEnviada.ds_lote || null,
           ds_fabricante: doseEnviada.ds_fabricante || null,
           dt_validade_vacina: doseEnviada.dt_validade_vacina || null,
+          dt_fabricacao_vacina: doseEnviada.dt_fabricacao_vacina || null,
           ds_via_aplicacao: doseEnviada.ds_via_aplicacao || null
         }, { transaction });
 

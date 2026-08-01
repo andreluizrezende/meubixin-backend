@@ -24,6 +24,8 @@ module.exports = (sequelize, DataTypes) => {
       descricao: { type: DataTypes.TEXT('long'), allowNull: true },
       link: { type: DataTypes.STRING(255), allowNull: true },
       st_ativo: { type: DataTypes.TINYINT, allowNull: false, defaultValue: 1 },
+      // 1 = antirrábica (ver migration 20260801130000)
+      st_antirrabica: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     },
     {
       sequelize,

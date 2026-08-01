@@ -41,6 +41,8 @@ module.exports = (sequelize, DataTypes) => {
       ds_lote: { type: DataTypes.STRING(60), allowNull: true },
       ds_fabricante: { type: DataTypes.STRING(120), allowNull: true },
       dt_validade_vacina: { type: DataTypes.DATEONLY, allowNull: true },
+      // Anexo XI pede fabricação E validade (migration 20260801120000).
+      dt_fabricacao_vacina: { type: DataTypes.DATEONLY, allowNull: true },
       ds_via_aplicacao: { type: DataTypes.STRING(60), allowNull: true },
       // Quem APLICOU (pode não ser quem assina o atestado)
       web_veterinarios_id: {

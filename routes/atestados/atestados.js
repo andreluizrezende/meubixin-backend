@@ -239,13 +239,19 @@ route.get('/atestados/:id/dados-pdf', async (req, res) => {
       { replacements: { id: atestado.id }, type: QueryTypes.SELECT, transaction }
     );
 
-    // Doses aplicadas — só para os documentos de vacinação.
+    // Doses aplicadas. Os documentos de vacinação usam a lista inteira; o
+    // atestado de SAÚDE entrou aqui porque, quando a finalidade é viagem, o MAPA
+    // exige comprovação da antirrábica — o gerador filtra o que interessa.
     let vacinas = [];
-    if (['vacinacao', 'carteira_vacinacao'].includes(atestado.tp_atestado)) {
+    if (['vacinacao', 'carteira_vacinacao', 'saude'].includes(atestado.tp_atestado)) {
       vacinas = await sequelize.query(
         `SELECT ag.id, ag.dt_data_aplicacao, ag.st_concluido,
-                ag.ds_lote, ag.ds_fabricante, ag.dt_validade_vacina, ag.ds_via_aplicacao,
+                ag.ds_lote, ag.ds_fabricante, ag.dt_validade_vacina,
+                ag.dt_fabricacao_vacina, ag.ds_via_aplicacao,
                 COALESCE(p.nome_protocolo, ps.ds_protocolos_saude) AS nome_protocolo,
+                -- COALESCE porque prescrições antigas podem ter a marca só no
+                -- catálogo; as novas carimbam em web_protocolos.
+                COALESCE(p.st_antirrabica, ps.st_antirrabica, 0) AS st_antirrabica,
                 va.no_completo AS aplicador_nome, va.nu_crmv AS aplicador_crmv,
                 va.ds_estado_crmv AS aplicador_uf
            FROM web_protocolos_agendas ag

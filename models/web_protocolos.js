@@ -65,6 +65,14 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: false
       },
+      // Antirrábica (1). Carimbado na prescrição, não lido por JOIN: a aba
+      // Vacinas deixa web_protocolos_saude_id NULO (nome vem do catálogo de
+      // produtos como texto livre). Mesmo motivo de nome_protocolo existir aqui.
+      st_antirrabica: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
       // Prescrição estruturada (Grupo A) — para a receita.
       ds_concentracao: { type: DataTypes.STRING(120), allowNull: true },
       ds_forma_farmaceutica: { type: DataTypes.STRING(120), allowNull: true },
