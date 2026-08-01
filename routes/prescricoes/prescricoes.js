@@ -1564,16 +1564,19 @@ route.get('/prescricoes/verificar/:codigo', async (req, res) => {
         r.dt_criacao,
         r.dt_assinatura,
         r.arquivo_s3_path,
-        COALESCE(v.no_completo, va.no_completo) AS no_completo,
-        COALESCE(v.nu_crmv, va.nu_crmv) AS nu_crmv,
-        COALESCE(v.ds_estado_crmv, va.ds_estado_crmv) AS ds_estado_crmv,
-        COALESCE(an.dt_data_anamnese, at.dt_emissao) AS dt_data_anamnese,
-        at.tp_atestado
+        COALESCE(v.no_completo, va.no_completo, vt.no_completo) AS no_completo,
+        COALESCE(v.nu_crmv, va.nu_crmv, vt.nu_crmv) AS nu_crmv,
+        COALESCE(v.ds_estado_crmv, va.ds_estado_crmv, vt.ds_estado_crmv) AS ds_estado_crmv,
+        COALESCE(an.dt_data_anamnese, at.dt_emissao, te.dt_emissao) AS dt_data_anamnese,
+        at.tp_atestado,
+        te.tp_termo
       FROM web_registros_prescricoes r
       LEFT JOIN web_anamneses an ON an.id = r.web_anamneses_id
       LEFT JOIN web_veterinarios v ON v.id = an.web_veterinarios_id
       LEFT JOIN web_atestados at ON at.id = r.web_atestados_id
       LEFT JOIN web_veterinarios va ON va.id = at.web_veterinarios_id
+      LEFT JOIN web_termos te ON te.id = r.web_termos_id
+      LEFT JOIN web_veterinarios vt ON vt.id = te.web_veterinarios_id
       WHERE r.codigo_verificacao = :codigo
     `;
 
@@ -1599,9 +1602,17 @@ route.get('/prescricoes/verificar/:codigo', async (req, res) => {
       carteira_vacinacao: 'Carteira de Vacinação',
       obito: 'Atestado de Óbito'
     };
+    const LABEL_TERMO = {
+      retirada_sem_alta: 'Termo de Retirada sem Alta Médica',
+      cirurgico: 'Termo de Consentimento para Procedimento Cirúrgico',
+      anestesico: 'Termo de Consentimento para Procedimento Anestésico',
+      ciencia_risco: 'Termo de Ciência de Risco e Prognóstico'
+    };
     const tipoDocumento = dados.tp_origem === 'atestado'
       ? (LABEL_ATESTADO[dados.tp_atestado] || 'Atestado')
-      : 'Prescrição';
+      : dados.tp_origem === 'termo'
+        ? (LABEL_TERMO[dados.tp_termo] || 'Termo')
+        : 'Prescrição';
 
     res.json({
       success: true,

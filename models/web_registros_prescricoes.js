@@ -14,7 +14,7 @@ module.exports = (sequelize, DataTypes) => {
     tp_origem: {
       type: DataTypes.STRING(20),
       allowNull: false,
-      defaultValue: 'prescricao' // prescricao | atestado
+      defaultValue: 'prescricao' // prescricao | atestado | termo
     },
     web_anamneses_id: {
       type: DataTypes.INTEGER,
@@ -26,9 +26,17 @@ module.exports = (sequelize, DataTypes) => {
     },
     web_atestados_id: {
       type: DataTypes.INTEGER,
-      allowNull: true, // null quando tp_origem = 'prescricao'
+      allowNull: true, // null quando tp_origem != 'atestado'
       references: {
         model: 'web_atestados',
+        key: 'id'
+      }
+    },
+    web_termos_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true, // null quando tp_origem != 'termo'
+      references: {
+        model: 'web_termos',
         key: 'id'
       }
     },
@@ -90,6 +98,10 @@ module.exports = (sequelize, DataTypes) => {
     web_registros_prescricoes.belongsTo(models.WebAtestados, {
       foreignKey: 'web_atestados_id',
       as: 'atestado'
+    });
+    web_registros_prescricoes.belongsTo(models.WebTermos, {
+      foreignKey: 'web_termos_id',
+      as: 'termo'
     });
   };
 

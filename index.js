@@ -67,6 +67,7 @@ const rotaAgenda = require('./routes/agenda/agenda')
 const rotaLembretes = require('./routes/agenda/lembretes')
 const rotaRetencao = require('./routes/retencao/retencao')
 const rotaAtestados = require('./routes/atestados/atestados')
+const rotaTermos = require('./routes/termos/termos')
 const rotaGeoVeterinarios = require('./routes/geo/veterinarios')
 const rotaAppAtestados = require('./routes/app/atestados')
 const rotaRetencaoWorker = require('./routes/retencao/retencaoWorker')
@@ -136,6 +137,8 @@ app.use(rotaAgenda);
 app.use(rotaRetencao);
 // Atestados: também usa route.use(requireAuth) próprio → por último.
 app.use(rotaAtestados);
+// Termos de consentimento: mesmo caso do atestado (requireAuth sem path).
+app.use(rotaTermos);
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`running on port: ${PORT}`))
