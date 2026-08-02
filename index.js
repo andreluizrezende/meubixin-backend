@@ -74,6 +74,7 @@ const rotaGeoVeterinarios = require('./routes/geo/veterinarios')
 const rotaAppAtestados = require('./routes/app/atestados')
 const rotaAppPrescricoes = require('./routes/app/prescricoes')
 const rotaAppAgenda = require('./routes/app/agenda')
+const rotaAppCobrancas = require('./routes/app/cobrancas')
 const rotaRetencaoWorker = require('./routes/retencao/retencaoWorker')
 const rotaPortal = require('./routes/portal/portal')
 
@@ -136,6 +137,10 @@ app.use(rotaAppPrescricoes);
 // CPF, também pública. Solicitar NÃO agenda — o pedido fica pendente até o vet
 // aceitar na tela de Agenda do web.
 app.use(rotaAppAgenda);
+// Financeiro do responsável no app (cobranças + checkout Stripe): mesmo escopo
+// por CPF, também pública. ⚠️ Precisa vir ANTES de rotaCobrancas, que faz
+// route.use(requireAuth) sem path e barraria estas com 401.
+app.use(rotaAppCobrancas);
 // Portal do Responsável (app mobile): auth PRÓPRIA (token de escopo 'portal', via
 // requirePortal) — NÃO o requireAuth do vet. Montado aqui, ANTES dos routers com
 // requireAuth global, senão seria barrado por eles.
