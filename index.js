@@ -72,6 +72,7 @@ const rotaTermos = require('./routes/termos/termos')
 const rotaAnexosProntuario = require('./routes/anexos/anexos')
 const rotaGeoVeterinarios = require('./routes/geo/veterinarios')
 const rotaAppAtestados = require('./routes/app/atestados')
+const rotaAppPrescricoes = require('./routes/app/prescricoes')
 const rotaRetencaoWorker = require('./routes/retencao/retencaoWorker')
 const rotaPortal = require('./routes/portal/portal')
 
@@ -125,6 +126,11 @@ app.use(rotaPublicoPagamento);
 app.use(rotaGeoVeterinarios);
 // Atestados no app do responsável (escopo por CPF, padrão do app): pública.
 app.use(rotaAppAtestados);
+// Receita/prescrições no app do responsável: mesmo escopo por CPF, também
+// pública. Precisa vir aqui (antes de connect/cobrancas/assinatura) pelo mesmo
+// motivo das de cima; montada depois de rotaPrescricoes de propósito, para o
+// prefixo /app/ nunca competir com as rotas /prescricoes/* do vet.
+app.use(rotaAppPrescricoes);
 // Portal do Responsável (app mobile): auth PRÓPRIA (token de escopo 'portal', via
 // requirePortal) — NÃO o requireAuth do vet. Montado aqui, ANTES dos routers com
 // requireAuth global, senão seria barrado por eles.
