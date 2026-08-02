@@ -73,6 +73,7 @@ const rotaAnexosProntuario = require('./routes/anexos/anexos')
 const rotaGeoVeterinarios = require('./routes/geo/veterinarios')
 const rotaAppAtestados = require('./routes/app/atestados')
 const rotaAppPrescricoes = require('./routes/app/prescricoes')
+const rotaAppAgenda = require('./routes/app/agenda')
 const rotaRetencaoWorker = require('./routes/retencao/retencaoWorker')
 const rotaPortal = require('./routes/portal/portal')
 
@@ -131,6 +132,10 @@ app.use(rotaAppAtestados);
 // motivo das de cima; montada depois de rotaPrescricoes de propósito, para o
 // prefixo /app/ nunca competir com as rotas /prescricoes/* do vet.
 app.use(rotaAppPrescricoes);
+// Agenda do responsável no app (ver próximos + pedir horário): mesmo escopo por
+// CPF, também pública. Solicitar NÃO agenda — o pedido fica pendente até o vet
+// aceitar na tela de Agenda do web.
+app.use(rotaAppAgenda);
 // Portal do Responsável (app mobile): auth PRÓPRIA (token de escopo 'portal', via
 // requirePortal) — NÃO o requireAuth do vet. Montado aqui, ANTES dos routers com
 // requireAuth global, senão seria barrado por eles.
