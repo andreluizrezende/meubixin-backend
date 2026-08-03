@@ -77,6 +77,7 @@ const rotaAppAgenda = require('./routes/app/agenda')
 const rotaAppCobrancas = require('./routes/app/cobrancas')
 const rotaAppConsentimento = require('./routes/app/consentimento')
 const rotaAppSenha = require('./routes/app/senha')
+const rotaAppDocumentos = require('./routes/app/documentos')
 const rotaRetencaoWorker = require('./routes/retencao/retencaoWorker')
 const rotaPortal = require('./routes/portal/portal')
 
@@ -148,6 +149,8 @@ app.use(rotaAppConsentimento);
 // Recuperação de senha do app (código de 6 dígitos, uso único): pública por
 // natureza — quem a chama esqueceu a senha e não tem sessão.
 app.use(rotaAppSenha);
+// Documentos do pet (atestado + receita + termo) no app: escopo por CPF.
+app.use(rotaAppDocumentos);
 // Portal do Responsável (app mobile): auth PRÓPRIA (token de escopo 'portal', via
 // requirePortal) — NÃO o requireAuth do vet. Montado aqui, ANTES dos routers com
 // requireAuth global, senão seria barrado por eles.
