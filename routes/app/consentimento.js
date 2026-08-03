@@ -36,6 +36,45 @@ const CPF_SQL = `REPLACE(REPLACE(REPLACE(nu_cpf, '.', ''), '-', ''), ' ', '')`;
 
 const CHAVES = ['st_email', 'st_whatsapp', 'st_marketing'];
 
+/*
+ * ESPELHO NO CAMPO LEGADO `mob_usuarios.st_envia_mensagem`.
+ *
+ * O app tinha, na mesma tela, dois controles para a mesma coisa: este campo
+ * (0=E-mail, 1=WhatsApp, 2=ambos) e os interruptores de `web_consentimento`.
+ * Quem manda de verdade é o consentimento — `utils/retencao.js` só lê ele; o
+ * campo legado NÃO é consultado por nenhuma lógica de envio. Mas continuava
+ * sendo gravado por `EditarUsuario`, então dava para os dois discordarem
+ * ("Meio de comunicação = E-mail" e ainda assim receber WhatsApp).
+ *
+ * A tela deixou de expor o campo legado; aqui ele passa a ser DERIVADO do
+ * consentimento, para o dado antigo parar de mentir. É escrita numa coluna que
+ * já existe — nenhum ALTER em `mob_*`.
+ *
+ * ⚠️ O campo legado não sabe representar "nenhum canal": com e-mail e WhatsApp
+ * ambos desligados, o mais próximo é 0 (e-mail). Quem decide o envio é o
+ * consentimento, então essa imprecisão não afeta comportamento — mas não tente
+ * ler `st_envia_mensagem` como se fosse a verdade.
+ */
+function derivarEnviaMensagem({ st_email, st_whatsapp }) {
+  const email = Number(st_email) ? 1 : 0;
+  const whats = Number(st_whatsapp) ? 1 : 0;
+  if (email && whats) return 2;
+  if (whats) return 1;
+  return 0;
+}
+
+// mob_usuarios ↔ mob_tutores casam por CPF (verificado no dev: 476 de 476).
+async function espelharEnviaMensagem(cpf, consentimento) {
+  const valor = derivarEnviaMensagem(consentimento);
+  await sequelize.query(
+    `UPDATE mob_usuarios
+        SET st_envia_mensagem = :valor
+      WHERE REPLACE(REPLACE(REPLACE(nu_cpf, '.', ''), '-', ''), ' ', '') = :cpf`,
+    { replacements: { valor, cpf }, type: QueryTypes.UPDATE }
+  );
+  return valor;
+}
+
 function exigirCpf(valor, res) {
   const cpf = soDigitos(valor);
   if (!cpf) {
@@ -146,7 +185,21 @@ route.put('/app/consentimento/:cpf', async (req, res) => {
       consentimento[chave] = registros.some((r) => Number(r[chave]) === 0) ? 0 : 1;
     }
 
-    return res.json({ success: true, consentimento, tutores_afetados: tutores.length });
+    // Mantém o campo legado coerente — ver o comentário em espelharEnviaMensagem.
+    // Best-effort: se falhar, o consentimento (que é o que vale) já foi salvo.
+    let st_envia_mensagem = null;
+    try {
+      st_envia_mensagem = await espelharEnviaMensagem(cpf, consentimento);
+    } catch (e) {
+      console.warn('espelho de st_envia_mensagem falhou para o CPF %s: %s', cpf, e.message);
+    }
+
+    return res.json({
+      success: true,
+      consentimento,
+      tutores_afetados: tutores.length,
+      st_envia_mensagem,
+    });
   } catch (err) {
     console.error('PUT /app/consentimento/:cpf', err);
     return res.status(500).json({ success: false, message: 'Erro ao salvar as preferências: ' + err.message });
