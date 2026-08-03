@@ -13,7 +13,7 @@
  * continua sob controle do profissional — por isso não existe aqui nenhuma
  * escrita em `web_agendamentos`.
  *
- *   GET  /app/agenda/responsavel/:cpf   próximos atendimentos + solicitações
+ *   GET  /app/agenda/responsavel/:cpf   próximos atendimentos + videochamadas + solicitações
  *   POST /app/agenda/solicitar          pede um horário (vira pendente p/ o vet)
  */
 const express = require('express');
@@ -63,14 +63,21 @@ route.get('/app/agenda/responsavel/:cpf', async (req, res) => {
     // A janela começa em NOW() - 1 dia (e não em NOW()) de propósito: o
     // atendimento de hoje mais cedo ainda interessa ao responsável.
     // Cancelado e faltou ficam de fora — não são "próximos".
+    //
+    // O LEFT JOIN em web_conferencias é pelo vínculo `web_conferencias_id`: uma
+    // teleconsulta agendada pode ter sala Jitsi própria (é assim que
+    // utils/processarLembretes.js manda o link no lembrete). Quando tem, o app
+    // mostra o botão de entrar no próprio card do atendimento.
     const agendamentos = await sequelize.query(
       `SELECT ag.id, ag.tp_agendamento, ag.dt_inicio, ag.ds_titulo, ag.ds_status,
               an.id AS animal_id, an.no_nome AS animal_nome,
-              v.no_completo AS vet_nome, v.nu_crmv, v.ds_estado_crmv
+              v.no_completo AS vet_nome, v.nu_crmv, v.ds_estado_crmv,
+              c.ds_link
          FROM web_agendamentos ag
          JOIN mob_animais an ON an.id = ag.mob_animais_id
          JOIN mob_tutores t ON t.id = an.mob_tutores_id
          LEFT JOIN web_veterinarios v ON v.id = ag.web_veterinarios_id
+         LEFT JOIN web_conferencias c ON c.id = ag.web_conferencias_id
         WHERE ${CPF_SQL} = :cpf
           AND ag.dt_inicio >= (NOW() - INTERVAL 1 DAY)
           AND (ag.ds_status IS NULL OR ag.ds_status NOT IN ('cancelado','faltou'))
@@ -97,7 +104,41 @@ route.get('/app/agenda/responsavel/:cpf', async (req, res) => {
       { replacements: { cpf }, type: QueryTypes.SELECT }
     );
 
-    return res.json({ success: true, agendamentos, solicitacoes });
+    // VIDEOCONFERÊNCIAS. Não são `web_agendamentos`: a videochamada do sistema
+    // web é criada em `web_conferencias`, com sala Jitsi própria, e nunca gera
+    // linha na agenda. Para o responsável isso é invisível — ele só quer saber o
+    // que vem a seguir —, então vai na mesma resposta e a tela mescla.
+    //
+    // Mesma janela dos agendamentos (NOW() - 1 dia) e só 'agendada': há salas
+    // antigas que ficaram nesse status sem nunca terem acontecido, e listá-las
+    // como compromisso futuro seria falso.
+    //
+    // O NOT EXISTS evita item duplicado: a conferência já amarrada a um
+    // agendamento veio na consulta acima, com o link junto. Hoje nenhum registro
+    // usa esse vínculo, mas ele existe no modelo e nos lembretes — quando a
+    // agenda do vet começar a preenchê-lo, a mesma videochamada apareceria duas
+    // vezes na tela.
+    const conferencias = await sequelize.query(
+      `SELECT c.id, c.dt_conferencia, c.ds_link, c.ds_status,
+              an.id AS animal_id, an.no_nome AS animal_nome,
+              v.no_completo AS vet_nome, v.nu_crmv, v.ds_estado_crmv
+         FROM web_conferencias c
+         JOIN mob_animais an ON an.id = c.mob_animais_id
+         JOIN mob_tutores t ON t.id = an.mob_tutores_id
+         LEFT JOIN web_veterinarios v ON v.id = c.web_veterinarios_id
+        WHERE ${CPF_SQL} = :cpf
+          AND c.ds_status = 'agendada'
+          AND c.dt_conferencia >= (NOW() - INTERVAL 1 DAY)
+          AND NOT EXISTS (
+                SELECT 1 FROM web_agendamentos ag2
+                 WHERE ag2.web_conferencias_id = c.id
+              )
+        ORDER BY c.dt_conferencia ASC
+        LIMIT 30`,
+      { replacements: { cpf }, type: QueryTypes.SELECT }
+    );
+
+    return res.json({ success: true, agendamentos, conferencias, solicitacoes });
   } catch (err) {
     console.error('GET /app/agenda/responsavel/:cpf', err);
     return res.status(500).json({ success: false, message: 'Erro ao carregar a agenda: ' + err.message });
