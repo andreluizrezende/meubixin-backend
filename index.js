@@ -76,6 +76,7 @@ const rotaAppPrescricoes = require('./routes/app/prescricoes')
 const rotaAppAgenda = require('./routes/app/agenda')
 const rotaAppCobrancas = require('./routes/app/cobrancas')
 const rotaAppConsentimento = require('./routes/app/consentimento')
+const rotaAppSenha = require('./routes/app/senha')
 const rotaRetencaoWorker = require('./routes/retencao/retencaoWorker')
 const rotaPortal = require('./routes/portal/portal')
 
@@ -144,6 +145,9 @@ app.use(rotaAppAgenda);
 app.use(rotaAppCobrancas);
 // Preferências de comunicação (LGPD) do responsável no app: escopo por CPF.
 app.use(rotaAppConsentimento);
+// Recuperação de senha do app (código de 6 dígitos, uso único): pública por
+// natureza — quem a chama esqueceu a senha e não tem sessão.
+app.use(rotaAppSenha);
 // Portal do Responsável (app mobile): auth PRÓPRIA (token de escopo 'portal', via
 // requirePortal) — NÃO o requireAuth do vet. Montado aqui, ANTES dos routers com
 // requireAuth global, senão seria barrado por eles.

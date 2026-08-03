@@ -298,8 +298,11 @@ route.post("/recuperarSenha", async (req, res) => {
         return false;
       });
 
+      // ⚠️ Devolvia o REGISTRO INTEIRO (ds_senha em hash, CPF, e-mail, telefone)
+      // para quem acertasse CPF + telefone. Agora só confirma a existência.
+      // O app antigo só testa `resUser === false`, então isto não o quebra.
       if (usuarioEncontrado) {
-        return res.send(usuarioEncontrado);
+        return res.send(true);
       } else {
         return res.send(false);
       }
@@ -314,9 +317,8 @@ route.post("/recuperarSenha", async (req, res) => {
     console.log('até aqui vem');
 
     const resposta = await usuarios.findOne({ where: whereClause });
-    console.log(whereClause);
-    console.log(resposta);
-    resposta ? res.send(resposta) : res.send(false);
+    // Mesmo motivo do caminho por telefone: nada de devolver o registro.
+    resposta ? res.send(true) : res.send(false);
   } catch (error) {
     console.log("Erro em /recuperarSenha!");
     console.log(error.message);
@@ -324,13 +326,38 @@ route.post("/recuperarSenha", async (req, res) => {
   }
 });
 
+/*
+ * ⚠️ ROTA LEGADA E INSEGURA — SUBSTITUÍDA POR /app/senha/*
+ *
+ * Ela troca a senha de qualquer conta sabendo só CPF + e-mail (ou telefone),
+ * SEM nenhuma prova de posse: não há código, token nem senha atual. É takeover
+ * de conta em uma requisição, e os dois dados são descobríveis.
+ *
+ * Continua ligada por um motivo só: a versão do app que está NAS LOJAS depende
+ * dela. Desligar hoje deixaria esses usuários sem recuperar senha.
+ *
+ * COMO DESLIGAR, quando o app novo (com /app/senha/*) estiver publicado e
+ * adotado: definir a env var
+ *
+ *     APP_SENHA_LEGADO=off
+ *
+ * na Vercel (Production) e redeployar. Não precisa mexer no código.
+ */
 route.put("/updateSenha", async (req, res) => {
-  console.log('ta na rota')
-  console.log(req.body)
+  if (String(process.env.APP_SENHA_LEGADO || 'on').toLowerCase() === 'off') {
+    return res.status(410).json({
+      success: false,
+      message: 'Atualize o aplicativo para redefinir sua senha com segurança.',
+    });
+  }
+
+  console.warn(
+    '[LEGADO INSEGURO] PUT /updateSenha chamado (troca senha sem prova de posse). ' +
+    'Migrar para /app/senha/* e desligar com APP_SENHA_LEGADO=off.'
+  );
 
   try {
     const { nu_cpf, ds_email, nu_telefone_completo, ds_senha } = req.body;
-    console.log(req.body)
 
     const senha = ds_senha.toString();
     const hashedPassword = await bcrypt.hash(senha, 10);
@@ -406,13 +433,13 @@ route.put("/updateSenha", async (req, res) => {
           );
 
           console.log('Resposta do envio de WhatsApp:', whatsappResponse.data);
-          console.log(`Senha alterada para o telefone ${nu_telefone_completo}. Nova senha: ${ds_senha}`);
+          // (log da senha em claro removido)
 
           res.send(true);
         } catch (whatsappError) {
           console.error('Erro ao enviar mensagem WhatsApp:', whatsappError);
           // Mesmo com erro no envio do WhatsApp, a senha foi alterada
-          console.log(`Senha alterada para o telefone ${nu_telefone_completo}, mas houve um erro ao enviar a mensagem.`);
+          // (log da senha em claro removido)
           res.send(true);
         }
       } else {
