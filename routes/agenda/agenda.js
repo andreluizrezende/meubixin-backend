@@ -168,6 +168,29 @@ route.post('/agenda/solicitacoes/:id/aceitar', async (req, res) => {
     const dtInicio = req.body && req.body.dt_inicio ? req.body.dt_inicio : sol.dt_sugerida;
     if (!dtInicio) return res.status(400).json({ success: false, message: 'Informe a data/hora do agendamento.' });
 
+    /*
+     * ⚠️ O CONTATO DO RESPONSÁVEL PRECISA VIR JUNTO, senão o agendamento nasce
+     * SEM LEMBRETE NENHUM.
+     *
+     * `gerarLembretes` monta os canais a partir de `ds_email_responsavel` e
+     * `nu_telefone_responsavel`; sem nenhum dos dois ele devolve
+     * `{ gerados: 0, motivo: 'responsável sem e-mail/WhatsApp' }` e sai sem
+     * criar linha. Isso NÃO derruba a rota — o agendamento é criado, a resposta
+     * é 201 e ninguém percebe que o lembrete não existe.
+     *
+     * A rota `POST /agenda` não sofre disso porque o vet digita os contatos no
+     * formulário. Aqui a solicitação vem do app e não os carrega — mas eles
+     * existem em `mob_tutores`, ligados ao animal. Buscar aqui é o que faltava.
+     */
+    const [tutor] = await sequelize.query(
+      `SELECT t.ds_email, t.nu_telefone_completo
+         FROM mob_animais a
+         LEFT JOIN mob_tutores t ON t.id = a.mob_tutores_id
+        WHERE a.id = :animalId
+        LIMIT 1`,
+      { replacements: { animalId: sol.mob_animais_id }, type: QueryTypes.SELECT }
+    );
+
     const ag = await WebAgendamentos.create({
       web_veterinarios_id: req.vetId,
       mob_animais_id: sol.mob_animais_id,
@@ -175,6 +198,8 @@ route.post('/agenda/solicitacoes/:id/aceitar', async (req, res) => {
       dt_inicio: dtInicio,
       nu_duracao_min: (req.body && req.body.nu_duracao_min) || 30,
       ds_titulo: sol.ds_motivo || null,
+      ds_email_responsavel: (tutor && tutor.ds_email) || null,
+      nu_telefone_responsavel: (tutor && tutor.nu_telefone_completo) || null,
       ds_status: 'agendado',
     });
     const lembretes = await gerarLembretesSeguro(ag, 'aceitar-solicitacao');
