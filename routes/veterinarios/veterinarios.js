@@ -977,14 +977,103 @@ route.put('/veterinarios', async (req, res) => {
 });
 
 // Rota para deletar um veterinário mobile pelo ID
+/*
+ * Exclusão de veterinário — reescrita em 06/08/2026.
+ *
+ * 🔴 O QUE HAVIA ANTES, e por que era o pior tipo de falha:
+ *
+ *     catch (error) {
+ *       console.log('ERRO em /veterinarios');
+ *       console.log(error.message);
+ *       // ...e nada mais: NENHUM res.send()
+ *     }
+ *
+ * Sem resposta, a requisição fica pendurada até o cliente desistir. No app o
+ * axios não tem timeout configurado, então a promessa simplesmente nunca
+ * resolvia: o usuário confirmava a exclusão e **não acontecia nada** — nem
+ * sucesso, nem erro, nem o veterinário saindo da lista. Foi exatamente o
+ * sintoma relatado ("o processo não foi concluído").
+ *
+ * E o erro engolido era real e recorrente: o banco recusa apagar veterinário
+ * que ainda é referenciado. Duas tabelas apontam para `mob_veterinarios`:
+ *   - `mob_animais.mob_veterinarios_id`     (animais sob cuidado dele)
+ *   - `web_veterinarios.mob_veterinarios_id` (conta dele no sistema web)
+ *
+ * ⚠️ Os vínculos são contados ANTES do delete, para a resposta poder dizer o
+ * QUE impede e QUANTOS são — "não foi possível" sozinho não deixa o usuário
+ * resolver nada. O catch continua tratando violação de FK como rede de
+ * segurança, para o caso de um vínculo novo aparecer sem esta contagem saber.
+ *
+ * ⚠️ Compatibilidade com o app das lojas: o sucesso continua respondendo
+ * **200**, que é o que aquele código testa (`response.status === 200`). O corpo
+ * mudou de `true` para JSON, e isso é seguro porque o corpo não era lido.
+ */
 route.delete('/veterinarios/:id', async (req, res) => {
+  const { id } = req.params;
+
   try {
-    const { id } = req.params;
-    const resposta = await mob_veterinarios.destroy({ where: { id } });
-    resposta ? res.send(true) : res.send(false);
+    const veterinario = await mob_veterinarios.findByPk(id);
+    if (!veterinario) {
+      return res.status(404).json({
+        ok: false,
+        motivo: 'nao_encontrado',
+        mensagem: 'Este veterinário não existe mais. Atualize a lista.',
+      });
+    }
+
+    const [animais, contasWeb] = await Promise.all([
+      mob_animais.count({ where: { mob_veterinarios_id: id } }),
+      web_veterinarios.count({ where: { mob_veterinarios_id: id } }),
+    ]);
+
+    if (animais > 0 || contasWeb > 0) {
+      // Mensagem escrita para QUEM LÊ NA TELA: diz o vínculo, o número e a saída.
+      const partes = [];
+      if (animais > 0) {
+        partes.push(`${animais} ${animais === 1 ? 'animal está' : 'animais estão'} sob os cuidados dele`);
+      }
+      if (contasWeb > 0) {
+        partes.push('ele tem uma conta ativa no sistema web');
+      }
+
+      return res.status(409).json({
+        ok: false,
+        motivo: 'vinculado',
+        animais,
+        contasWeb,
+        mensagem:
+          `Não é possível excluir ${veterinario.no_completo ? veterinario.no_completo.trim() : 'este veterinário'}: ` +
+          `${partes.join(' e ')}. ` +
+          (animais > 0
+            ? 'Vincule esses animais a outro veterinário antes de excluir.'
+            : 'Remova a conta no sistema web antes de excluir.'),
+      });
+    }
+
+    await mob_veterinarios.destroy({ where: { id } });
+    return res.status(200).json({ ok: true, mensagem: 'Veterinário excluído.' });
   } catch (error) {
-    console.log('ERRO em /veterinarios');
-    console.log(error.message);
+    console.error('ERRO em DELETE /veterinarios/:id —', error.message);
+
+    // Rede de segurança: vínculo que a contagem acima ainda não conhece.
+    const ehFk =
+      error?.name === 'SequelizeForeignKeyConstraintError' ||
+      /foreign key constraint/i.test(error?.message || '');
+
+    if (ehFk) {
+      return res.status(409).json({
+        ok: false,
+        motivo: 'vinculado',
+        mensagem:
+          'Não é possível excluir: este veterinário ainda está vinculado a outros registros do sistema.',
+      });
+    }
+
+    return res.status(500).json({
+      ok: false,
+      motivo: 'erro',
+      mensagem: 'Não foi possível excluir o veterinário. Tente novamente.',
+    });
   }
 });
 
