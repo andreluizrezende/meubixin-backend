@@ -16,6 +16,59 @@ const axios = require('axios')
 const GOOGLE_CLIENT_ID = "867699850241-sfm2tk642at1j3g0anrntcu044ki9h48.apps.googleusercontent.com";
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
+/*
+ * AUDIENCES ACEITOS EM /usuarioGoogleLogin — preparado em 07/08/2026.
+ *
+ * ⚠️ POR QUE PRECISA SER LISTA. O `aud` de um ID token é o OAuth client que
+ * INICIOU o pedido. No app, o `expo-auth-session` escolhe o client por
+ * plataforma e não deixa escolher outro:
+ *
+ *     Platform.select({ ios:'iosClientId', android:'androidClientId',
+ *                       default:'webClientId' })
+ *
+ * Ou seja: no Android o token chega com `aud` = client ANDROID, que é diferente
+ * do `GOOGLE_CLIENT_ID` acima. Com `audience` string, o `verifyIdToken` recusa
+ * um token legítimo. (O contorno antigo — proxy `auth.expo.io` para usar o
+ * client web em nativo — não existe mais: `useProxy` saiu da API do
+ * expo-auth-session e o que sobrou está marcado @deprecated.)
+ *
+ * O `verifyIdToken` aceita `string | string[]` (google-auth-library), então
+ * basta listar os clients legítimos.
+ *
+ * ⚠️ NÃO é "aceitar qualquer origem": só entram os client IDs deste projeto
+ * Google. Token emitido para outro app continua sendo rejeitado.
+ *
+ * ---------------------------------------------------------------------------
+ * COMO ATIVAR, quando o OAuth client Android existir no Google Cloud Console:
+ *
+ *   1. criar o client ANDROID para `com.cicatribioVet` com o SHA-1 da keystore
+ *      usada no build (a do EAS hoje é a `3RHLJ_BTQ1`; o SHA-1 sai de
+ *      `eas credentials -p android`);
+ *   2. definir a env var na Vercel e redeployar:
+ *          GOOGLE_CLIENT_ID_ANDROID=<id>.apps.googleusercontent.com
+ *      (ou, se preferir cravar no código, preencher a constante abaixo);
+ *   3. no app, preencher `GOOGLE_CLIENT_ID_ANDROID` em
+ *      `utils/loginGoogleNativo/config.js`.
+ *
+ * ⚠️ Se o app for publicado na Play Store com ASSINATURA GERENCIADA pelo
+ * Google, são DOIS SHA-1 a registrar: o da chave de upload e o da chave de
+ * assinatura da Play. Com só o primeiro, o login funciona no APK interno e
+ * quebra na versão da loja.
+ * ---------------------------------------------------------------------------
+ *
+ * Enquanto não houver client Android, a lista fica com um item só e o
+ * comportamento é IDÊNTICO ao de antes — `[x]` e `"x"` são equivalentes para o
+ * `verifyIdToken`. Nada muda para quem já usa a rota.
+ */
+const GOOGLE_CLIENT_ID_ANDROID = process.env.GOOGLE_CLIENT_ID_ANDROID || null;
+const GOOGLE_CLIENT_ID_IOS = process.env.GOOGLE_CLIENT_ID_IOS || null;
+
+const GOOGLE_AUDIENCES = [
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_ID_ANDROID,
+  GOOGLE_CLIENT_ID_IOS,
+].filter(Boolean);
+
 route.post("/usuarioRegister", async (req, res) => {
   try {
     const { no_completo, ds_senha, ds_email, nu_telefone_completo, nu_cpf } =
@@ -78,12 +131,21 @@ route.put("/usuarioEdit", async (req, res) => {
 route.post("/usuarioGoogleLogin", async (req, res) => {
   try {
     const { token: idToken } = req.body;
-    console.log("Dados que chegaram", req.body)
 
-    // Verifica o token recebido do Google
+    /*
+     * ⚠️ NÃO logar `req.body`: ele contém o ID token inteiro, que é uma
+     * credencial válida por ~1h. Log de plataforma é lido por mais gente do que
+     * se imagina, e um token no log é uma sessão de graça para quem o achar.
+     * Antes aqui havia `console.log("Dados que chegaram", req.body)`.
+     */
+    if (!idToken) {
+      return res.status(400).json({ error: "Token do Google não enviado." });
+    }
+
+    // Verifica o token recebido do Google. Ver GOOGLE_AUDIENCES no topo.
     const ticket = await client.verifyIdToken({
       idToken,
-      audience: GOOGLE_CLIENT_ID,
+      audience: GOOGLE_AUDIENCES,
     });
 
     const payload = ticket.getPayload();
@@ -115,6 +177,33 @@ route.post("/usuarioGoogleLogin", async (req, res) => {
     res.json({ status: "success", exists: true, user });
   } catch (error) {
     console.log("Erro no login com Google:", error.message);
+
+    /*
+     * ⚠️ Diagnóstico do erro MAIS PROVÁVEL desta rota, e o mais difícil de
+     * adivinhar: `aud` fora da lista. A mensagem do google-auth-library é
+     * "Wrong recipient, payload audience != requiredAudience", que não diz qual
+     * client faltou. Sem esta linha, quem estiver plugando o login Google do
+     * app vê só "Falha na autenticação" e não tem como saber que falta
+     * registrar o client Android.
+     *
+     * O `aud` recebido vai só para o LOG do servidor, nunca para a resposta:
+     * é client ID de terceiro e não ajuda quem está na tela.
+     */
+    if (/audience/i.test(error.message || "")) {
+      let audRecebido = "(não foi possível ler)";
+      try {
+        const corpo = JSON.parse(
+          Buffer.from(String(req.body?.token).split(".")[1], "base64").toString("utf8")
+        );
+        audRecebido = corpo.aud;
+      } catch {}
+      console.log(
+        "  ↳ audience recusado. Recebido:", audRecebido,
+        "| aceitos:", GOOGLE_AUDIENCES.join(", "),
+        "| Falta registrar o client desta plataforma? Ver GOOGLE_AUDIENCES no topo deste arquivo."
+      );
+    }
+
     res.status(400).json({ error: "Falha na autenticação do Google" });
   }
 });
