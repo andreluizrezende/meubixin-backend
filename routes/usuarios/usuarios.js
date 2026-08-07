@@ -56,18 +56,46 @@ const client = new OAuth2Client(GOOGLE_CLIENT_ID);
  * quebra na versão da loja.
  * ---------------------------------------------------------------------------
  *
- * Enquanto não houver client Android, a lista fica com um item só e o
- * comportamento é IDÊNTICO ao de antes — `[x]` e `"x"` são equivalentes para o
- * `verifyIdToken`. Nada muda para quem já usa a rota.
+ * O client ANDROID (upload) foi criado em 07/08/2026 e está na lista abaixo.
  */
-const GOOGLE_CLIENT_ID_ANDROID = process.env.GOOGLE_CLIENT_ID_ANDROID || null;
-const GOOGLE_CLIENT_ID_IOS = process.env.GOOGLE_CLIENT_ID_IOS || null;
 
-const GOOGLE_AUDIENCES = [
+/*
+ * Clients OAuth DESTE projeto (867699850241) que podem emitir token para o app.
+ *
+ * ⚠️ Ficam no código, e não em env var, de propósito: client ID não é segredo
+ * (vai dentro do bundle do app de qualquer forma), muda muito raramente, e
+ * cravar aqui evita que o login quebre porque alguém esqueceu de configurar a
+ * variável num ambiente novo.
+ */
+const GOOGLE_CLIENT_IDS_CONHECIDOS = [
+  // Web — usado pelo portal e valor histórico desta rota.
   GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_ID_ANDROID,
-  GOOGLE_CLIENT_ID_IOS,
-].filter(Boolean);
+  // Android, pacote com.cicatribioVet, chave de UPLOAD (SHA-1 4F:75:…:F2:A9).
+  "867699850241-d39bs25uhhp2n2fstt5dip20bgvl45m6.apps.googleusercontent.com",
+];
+
+/*
+ * 🔴 AINDA FALTA a chave de ASSINATURA DA PLAY (SHA-1 30:A2:…:95:11).
+ *
+ * Ao tentar registrá-la, o Console recusou com "nome do pacote e impressão
+ * digital já estão em uso" — ou seja, existe um client com esse par em algum
+ * lugar (provavelmente criado pelo Firebase, que gera um OAuth client Android
+ * sozinho quando há app Firebase para o pacote). Enquanto o ID dele não for
+ * localizado, o login Google nativo funciona no APK interno/`preview` e FALHA
+ * na versão publicada na Play, porque lá o token vem assinado pela outra chave.
+ *
+ * Para ativar sem mexer em código: defina na Vercel e redeploye
+ *     GOOGLE_CLIENT_IDS_APP=<id>            (aceita vários, separados por vírgula)
+ */
+const GOOGLE_CLIENT_IDS_EXTRA = String(process.env.GOOGLE_CLIENT_IDS_APP || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+// `Set` porque repetir um audience não quebra, mas polui o log de diagnóstico.
+const GOOGLE_AUDIENCES = [
+  ...new Set([...GOOGLE_CLIENT_IDS_CONHECIDOS, ...GOOGLE_CLIENT_IDS_EXTRA].filter(Boolean)),
+];
 
 route.post("/usuarioRegister", async (req, res) => {
   try {
