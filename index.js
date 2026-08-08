@@ -71,6 +71,7 @@ const rotaAtestados = require('./routes/atestados/atestados')
 const rotaTermos = require('./routes/termos/termos')
 const rotaAnexosProntuario = require('./routes/anexos/anexos')
 const rotaGeoVeterinarios = require('./routes/geo/veterinarios')
+const rotaGeoParceiros = require('./routes/geo/parceiros')
 const rotaAppAtestados = require('./routes/app/atestados')
 const rotaAppPrescricoes = require('./routes/app/prescricoes')
 const rotaAppAgenda = require('./routes/app/agenda')
@@ -129,6 +130,11 @@ app.use(rotaBulario);
 app.use(rotaPublicoPagamento);
 // Busca de veterinários próximos (app do responsável): pública, sem sessão.
 app.use(rotaGeoVeterinarios);
+// Lojas parceiras próximas ("Onde comprar" no app): pública, mesma razão.
+// ⚠️ Tem de vir ANTES de `rotaParceiros`, que monta `/web-parceiros/:id` — não
+// há colisão hoje porque o caminho é `/geo/parceiros-proximos`, mas manter a
+// vizinhança com o geo dos vets deixa a regra visível.
+app.use(rotaGeoParceiros);
 // Atestados no app do responsável (escopo por CPF, padrão do app): pública.
 app.use(rotaAppAtestados);
 // Receita/prescrições no app do responsável: mesmo escopo por CPF, também

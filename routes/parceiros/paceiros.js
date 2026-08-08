@@ -308,7 +308,27 @@ route.post('/web-parceiros/cadastro', async (req, res) => {
 
     console.log("✅ Web parceiro criado com sucesso! ID:", novoParceiro.id);
 
-    const { ds_senha: _, ...parceiroResponse } = novoParceiro.toJSON();
+    /*
+     * Geocodifica já no cadastro — é por aqui que a maioria dos parceiros
+     * entra, e sem coordenada eles não aparecem em "Onde comprar".
+     *
+     * `antes` é montado com coordenadas nulas de propósito: a função decide
+     * pelo par (mudou o endereço? / está sem coordenada?), e num registro novo
+     * o segundo é sempre verdadeiro.
+     *
+     * ⚠️ A função é `async function` (hoisted), declarada mais abaixo junto do
+     * PUT — chamá-la aqui é seguro.
+     */
+    await geocodificarParceiroSeNecessario(
+      novoParceiro.id,
+      { nu_latitude: null, nu_longitude: null },
+      dadosCriacao
+    );
+
+    // Relê para a resposta sair com a coordenada recém-calculada; sem isto o
+    // sistema web mostraria o parceiro sem posição até alguém recarregar.
+    const parceiroSalvo = await web_parceiros.findByPk(novoParceiro.id);
+    const { ds_senha: _, ...parceiroResponse } = parceiroSalvo.toJSON();
 
     res.json({
       success: true,
@@ -498,6 +518,73 @@ route.get('/web-parceiros/:id', async (req, res) => {
   }
 });
 
+/*
+ * GEOCODIFICAÇÃO DO PARCEIRO — alimenta `GET /geo/parceiros-proximos`, que é a
+ * tela "Onde comprar" do app. Sem coordenada, o parceiro simplesmente NÃO
+ * APARECE lá (a query filtra `nu_latitude IS NOT NULL`).
+ *
+ * 🔴 O `montarEndereco` do utilitário NÃO SERVE PARA O PARCEIRO SEM ADAPTAR, e
+ * essa é a armadilha desta função. Ele lê `ds_logradouro`, `nu_numero` e
+ * `ds_uf` — campos que `web_veterinarios` tem e `web_parceiros` NÃO tem. O
+ * parceiro guarda `ds_endereco` e `ds_estado`.
+ *
+ * Passando o registro cru, o endereço sairia com CIDADE E CEP APENAS, sem rua e
+ * sem estado — e o geocodificador devolveria um ponto no centro da cidade
+ * marcado como exato. Erro silencioso: coordenada plausível, lugar errado.
+ */
+const CAMPOS_ENDERECO_PARCEIRO = [
+  'ds_endereco', 'ds_complemento', 'ds_bairro', 'ds_cidade', 'ds_estado', 'nu_cep',
+];
+
+function paraEnderecoGeocodificavel(p) {
+  return {
+    // `ds_endereco` costuma já trazer rua e número juntos; por isso vai inteiro
+    // em `ds_logradouro` e `nu_numero` fica vazio.
+    ds_logradouro: p.ds_endereco,
+    nu_numero: null,
+    ds_bairro: p.ds_bairro,
+    ds_cidade: p.ds_cidade,
+    // ⚠️ `ds_uf` recebe `ds_estado` — o nome difere, o conteúdo casa: o dado
+    // gravado é a SIGLA ("BA"), conferido no banco em 08/08/2026. O Nominatim
+    // aceita sigla ou nome por extenso; o que ele não perdoa é a ausência.
+    ds_uf: p.ds_estado,
+    nu_cep: p.nu_cep,
+  };
+}
+
+async function geocodificarParceiroSeNecessario(id, antes, alterado) {
+  try {
+    // Coordenada enviada explicitamente (ajuste manual do pino no sistema web)
+    // tem prioridade sobre a automática — quem cadastrou sabe onde a loja fica.
+    if (alterado.nu_latitude != null && alterado.nu_longitude != null) return;
+
+    const mudou = CAMPOS_ENDERECO_PARCEIRO.some(
+      (c) => c in alterado && String(alterado[c] ?? '') !== String(antes[c] ?? '')
+    );
+    const semCoordenada = antes.nu_latitude == null || antes.nu_longitude == null;
+    if (!mudou && !semCoordenada) return;
+
+    // Lê o registro já atualizado — o update acabou de rodar.
+    const atual = await web_parceiros.findByPk(id);
+    const { geocodificar } = require('../../utils/geocodificacao');
+    const ponto = await geocodificar(paraEnderecoGeocodificavel(atual));
+    if (!ponto) {
+      console.warn('[geo] sem coordenada para o parceiro', id);
+      return;
+    }
+    await web_parceiros.update(
+      { nu_latitude: ponto.latitude, nu_longitude: ponto.longitude },
+      { where: { id } }
+    );
+    console.log('[geo] parceiro', id, '->', ponto.latitude, ponto.longitude,
+      ponto.aproximado ? '(aproximado)' : '(exato)');
+  } catch (e) {
+    // ⚠️ NUNCA derruba o salvamento: geocodificar é complemento. O parceiro foi
+    // cadastrado, e só não aparece no mapa até a próxima tentativa.
+    console.warn('[geo] falhou para o parceiro', id, '-', e.message);
+  }
+}
+
 // Atualizar parceiro
 route.put('/web-parceiros/:id', async (req, res) => {
   try {
@@ -517,6 +604,14 @@ route.put('/web-parceiros/:id', async (req, res) => {
     }
 
     await web_parceiros.update(dadosAtualizacao, { where: { id } });
+
+    /*
+     * Roda DEPOIS do update e só quando o endereço mudou (ou nunca houve
+     * coordenada): geocodificar a cada salvamento gastaria a cota do provedor à
+     * toa. ⚠️ Com `await` de propósito — a resposta já leva a coordenada nova, e
+     * sem ele o sistema web mostraria o parceiro sem posição até recarregar.
+     */
+    await geocodificarParceiroSeNecessario(id, parceiroExistente, dadosAtualizacao);
 
     const parceiroAtualizado = await web_parceiros.findByPk(id, {
       attributes: { exclude: ['ds_senha'] }
