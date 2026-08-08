@@ -68,24 +68,63 @@ const client = new OAuth2Client(GOOGLE_CLIENT_ID);
  * variável num ambiente novo.
  */
 const GOOGLE_CLIENT_IDS_CONHECIDOS = [
-  // Web — usado pelo portal e valor histórico desta rota.
+  // Web do projeto 867699850241 — usado pelo PORTAL DO VETERINÁRIO e valor
+  // histórico desta rota. Continua aceito por causa do portal.
   GOOGLE_CLIENT_ID,
+
+  /*
+   * 🟢 Web do projeto 291028585576 (`meu-bixin`) — é o `aud` do app MEU BIXIN
+   * desde 08/08/2026, quando o app ganhou pacote (`com.meubixin`) e projeto
+   * Google Cloud próprios. O CicatriBioVET segue nas lojas com o de cima.
+   *
+   * ⚠️ TEM DE SER O CLIENT **WEB**, e é o erro fácil desta lista: o app passa
+   * o web como `serverClientId` ao `google-signin`, então é ele que vira o
+   * `aud`. O client ANDROID nunca aparece como audience neste fluxo — ele
+   * serve para o Google reconhecer o app pelo par pacote + SHA-1, e não é lido
+   * por código nenhum, nem daqui nem do app.
+   */
+  "291028585576-0spegjl01gb8n6bn0vorp8itv05rphdl.apps.googleusercontent.com",
+
   // Android, pacote com.cicatribioVet, chave de UPLOAD (SHA-1 4F:75:…:F2:A9).
+  // ⚠️ Herança do tempo do `expo-auth-session`, quando o `aud` PODIA ser um
+  // client Android. Com o `google-signin` isso não acontece mais; fica só
+  // porque o app antigo, publicado, ainda pode emitir token assim.
   "867699850241-d39bs25uhhp2n2fstt5dip20bgvl45m6.apps.googleusercontent.com",
 ];
 
 /*
- * 🔴 AINDA FALTA a chave de ASSINATURA DA PLAY (SHA-1 30:A2:…:95:11).
+ * Escape hatch para acrescentar audience sem deploy:
+ *     GOOGLE_CLIENT_IDS_APP=<id>     (aceita vários, separados por vírgula)
  *
- * Ao tentar registrá-la, o Console recusou com "nome do pacote e impressão
- * digital já estão em uso" — ou seja, existe um client com esse par em algum
- * lugar (provavelmente criado pelo Firebase, que gera um OAuth client Android
- * sozinho quando há app Firebase para o pacote). Enquanto o ID dele não for
- * localizado, o login Google nativo funciona no APK interno/`preview` e FALHA
- * na versão publicada na Play, porque lá o token vem assinado pela outra chave.
+ * 🔴 SE FOR USAR, PONHA UM CLIENT **WEB**. O comentário anterior aqui dizia só
+ * "<id>", num contexto que falava de client ANDROID, e isso induziu ao erro em
+ * 08/08/2026: a variável chegou a ser configurada com o client Android do Meu
+ * Bixin. Não funcionaria — com o `google-signin` o `aud` é sempre o web,
+ * passado como `serverClientId`. O sintoma seria um token legítimo recusado por
+ * audience, que não se parece com o DEVELOPER_ERROR e manda o diagnóstico para
+ * o lado errado.
  *
- * Para ativar sem mexer em código: defina na Vercel e redeploye
- *     GOOGLE_CLIENT_IDS_APP=<id>            (aceita vários, separados por vírgula)
+ * ⚠️ Hoje esta variável NÃO é necessária: o client web do Meu Bixin está
+ * cravado na lista acima.
+ *
+ * ---------------------------------------------------------------------------
+ * 🟡 O QUE AINDA FALTA — chave de ASSINATURA DA PLAY
+ *
+ * A Play reassina o app com a chave dela, então na versão publicada o Google
+ * reconhece o app por OUTRO SHA-1. Isso exige um SEGUNDO client Android no
+ * projeto 291028585576, e o SHA-1 só aparece depois do primeiro envio, em
+ * Play Console → Configuração → Integridade do app.
+ *
+ * ⚠️ Sem ele, o login funciona no APK interno e FALHA na versão da loja, com
+ * DEVELOPER_ERROR (código 10).
+ *
+ * ⚠️ Isto NÃO se resolve nesta lista: o client Android não é audience. É
+ * registro no Google Cloud Console, e nada muda aqui.
+ *
+ * 💡 O impasse antigo — o Console recusava a chave da Play do CicatriBioVET com
+ * "nome do pacote e impressão digital já estão em uso" — morreu com a troca de
+ * pacote: o conflito era do PAR pacote+SHA-1.
+ * ---------------------------------------------------------------------------
  */
 const GOOGLE_CLIENT_IDS_EXTRA = String(process.env.GOOGLE_CLIENT_IDS_APP || "")
   .split(",")
