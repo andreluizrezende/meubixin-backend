@@ -10,6 +10,12 @@ const path = require('path');
 
 const bcrypt = require('bcrypt');
 const { OAuth2Client } = require('google-auth-library');
+// 🔴 Token REAL e TIPADO. Estas rotas devolviam `jwt_token_here_<id>` — um
+// placeholder que o frontend guardava e mandava como Authorization, e que
+// nenhuma rota autenticada aceitava (401 → "Sessão expirada").
+// O tipo 'parceiro' impede que este token valha nas rotas do veterinário:
+// os ids das duas tabelas se sobrepõem. Ver utils/authToken.js.
+const { signAuthToken, TIPO_PARCEIRO } = require('../../utils/authToken');
 
 const client = new OAuth2Client('867699850241-is78nhfgn1blt5ji6ag9tfpdcn0cuspb.apps.googleusercontent.com');
 
@@ -59,7 +65,7 @@ route.post('/web-parceiros/login/google', async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Login com Google realizado com sucesso!",
-      token: `jwt_token_here_${parceiro.id}`,
+      token: signAuthToken(parceiro.id, TIPO_PARCEIRO),
       parceiro: parceiroResponse,
       googleData: {
         sub: payload['sub'],
@@ -133,7 +139,7 @@ route.post('/web-parceiros/login', async (req, res) => {
     res.json({
       success: true,
       message: "Login realizado com sucesso!",
-      token: `jwt_token_here_${parceiro.id}`,
+      token: signAuthToken(parceiro.id, TIPO_PARCEIRO),
       parceiro: parceiroResponse
     });
 
@@ -335,7 +341,7 @@ route.post('/web-parceiros/cadastro', async (req, res) => {
       message: googleData
         ? "Conta criada com sucesso usando Google!"
         : "Conta criada com sucesso!",
-      token: `jwt_token_here_${novoParceiro.id}`,
+      token: signAuthToken(novoParceiro.id, TIPO_PARCEIRO),
       parceiro: parceiroResponse,
       ...(googleData && {
         googleData: {
